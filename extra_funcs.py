@@ -121,6 +121,13 @@ d_translate = {
 }
 
 
+def add_date_info_to_df(df):
+    df["month"] = df["date"].dt.month
+    df["day_of_week"] = df["date"].dt.day_of_week
+    df["day_of_month"] = df["date"].dt.day
+    df["year_fraction"] = df["date"].dt.day_of_year / 366 + df["year"]
+
+
 def load_entire_dataframe(make_cuts=True):
 
     df = pd.read_csv(
@@ -131,10 +138,7 @@ def load_entire_dataframe(make_cuts=True):
         parse_dates=["D_ODTO"],
     ).rename(columns=d_columns_rename)
 
-    df["month"] = df["date"].dt.month
-    df["day_of_week"] = df["date"].dt.day_of_week
-    df["day_of_month"] = df["date"].dt.day
-    df["year_fraction"] = df["date"].dt.day_of_year / 366 + df["year"]
+    add_date_info_to_df(df)
 
     df["ID"] = df["Komb"].str[:8].astype(int)
 
@@ -145,9 +149,7 @@ def load_entire_dataframe(make_cuts=True):
 
     return df
 
-
-def df_to_X_y(df, y_label):
-
+def df_to_X(df):
     drop_columns = [
         "Komb",
         "date",
@@ -165,8 +167,11 @@ def df_to_X_y(df, y_label):
     ]
 
     X = df.drop(columns=drop_columns)
-    y = df.loc[:, y_label]
+    return X
 
+def df_to_X_y(df, y_label):
+    X = df_to_X(df)
+    y = df.loc[:, y_label]
     return X, y
 
 
@@ -1416,6 +1421,129 @@ def get_train_test_splits(df, time_intervals):
 #%%
 
 
+def params_from_optuna(d_optuna_all):
+
+    d_params = {}
+
+    d_params_base = {
+        "objective": "binary",
+        "verbose": -1,
+        "is_unbalance": False,
+        "bagging_freq": 1,
+    }
+
+    d_params["optuna_all"] = {
+        **d_params_base,
+        **{
+            "boosting": d_optuna_all["boosting_type"],
+            "max_depth": d_optuna_all["max_depth"],
+            "num_leaves": d_optuna_all["num_leaves"],
+            "scale_pos_weight": d_optuna_all["scale_pos_weight"],
+            "min_child_weight": d_optuna_all["min_child_weight"],
+            "subsample": d_optuna_all["subsample"],
+            "colsample_bytree": d_optuna_all["colsample_bytree"],
+            "bagging_fraction": d_optuna_all["bagging_fraction"],
+        },
+    }
+
+    params = d_params["optuna_all"]
+    return params
+
+def fl_from_optuna(d_optuna_all, d_data):
+
+    y_train_val = d_data["y_train_val"]
+
+    fl = FocalLoss(gamma=d_optuna_all["fl_gamma"], alpha=d_optuna_all["fl_alpha"])
+
+    init_score = np.full_like(
+        y_train_val, fl.init_score(y_train_val), dtype=float
+    )
+    fobj = fl.lgb_obj
+
+    return fl, init_score, fobj
+
+def dataset_train_from_optuna(d_optuna_all, d_data, init_score):
+
+    if "imputed" in d_optuna_all["dataset"]:
+        d_data["X_train_val"] = d_data["X_train_val_imputed"]
+        d_data["X_test"] = d_data["X_test_imputed"]
+
+    dataset_train = pandas_to_lgb_dataset(
+        d_data["X_train_val"],
+        d_data["y_train_val"],
+        columns_cat_all=d_data["columns_cat_all"],
+        columns_cat_subset=d_data["columns_cat_subset"],
+        method=d_optuna_all["dataset"],
+        init_score=init_score,
+    )
+
+    return dataset_train
+
+#%%
+
+import types
+
+
+class FLModel:
+    def __init__(self, d_optuna_all, d_data):
+        self.d_optuna_all = d_optuna_all
+        self.d_data = d_data
+        self._setup()
+
+
+    def _setup(self):
+        self.params = params_from_optuna(self.d_optuna_all)
+        self.fl, self.init_score, self.fobj = self._fl_from_optuna()
+        self.dataset_train = self._dataset_train_from_optuna()
+
+    def _fl_from_optuna(self):
+        fl, init_score, fobj = fl_from_optuna(self.d_optuna_all, self.d_data)
+        return fl, init_score, fobj
+
+    def _dataset_train_from_optuna(self):
+        dataset_train = dataset_train_from_optuna(self.d_optuna_all,
+                                                  self.d_data,
+                                                  self.init_score)
+        return dataset_train
+
+    def fit(self):
+        self.model = lgb.train(
+            self.params,
+            self.dataset_train,
+            num_boost_round=self.d_optuna_all["num_boost_round"],
+            verbose_eval=100,
+            fobj=self.fobj,
+        )
+        return self
+
+
+    def predict(self, X):
+# %%
+        return special.expit(
+            self.fl.init_score(self.d_data["y_train_val"]) + self.model.predict(X)
+        )
+
+    def get_model(self):
+
+        model = self.model
+        alpha = self.d_optuna_all["fl_alpha"]
+        gamma = self.d_optuna_all["fl_gamma"]
+        y_train_val =self.d_data["y_train_val"]
+
+        def predict_proba(self, X):
+            fl = FocalLoss(gamma=gamma, alpha=alpha)
+            pred = special.expit(fl.init_score(y_train_val) + model.predict(X))
+            return np.array([1 - pred, pred]).T
+
+        model.predict_proba = types.MethodType(predict_proba, model)
+        return model
+
+        # def predict_proba(self, X):
+        #     pred = self.predict(X)
+        #     return np.array([1 - pred, pred]).T
+
+#%%
+
 def add_ML_model(
     cfg,
     dicts,
@@ -1562,71 +1690,11 @@ def add_ML_model(
     for key_, value in d_optuna_all.items():
         print(f"    {key_}: {value}")
 
-    d_params = {}
 
-    d_params_base = {
-        "objective": "binary",
-        "verbose": -1,
-        "is_unbalance": False,
-        "bagging_freq": 1,
-    }
+    model = FLModel(d_optuna_all, d_data).fit()
 
-    fl = FocalLoss(gamma=d_optuna_all["fl_gamma"], alpha=d_optuna_all["fl_alpha"])
-
-    d_params["optuna_all"] = {
-        **d_params_base,
-        **{
-            "boosting": d_optuna_all["boosting_type"],
-            "max_depth": d_optuna_all["max_depth"],
-            "num_leaves": d_optuna_all["num_leaves"],
-            "scale_pos_weight": d_optuna_all["scale_pos_weight"],
-            "min_child_weight": d_optuna_all["min_child_weight"],
-            "subsample": d_optuna_all["subsample"],
-            "colsample_bytree": d_optuna_all["colsample_bytree"],
-            "bagging_fraction": d_optuna_all["bagging_fraction"],
-        },
-    }
-
-    params = d_params["optuna_all"]
-    # dataset = d_lgb_datasets[d_optuna_all["dataset"]]
-
-    if "imputed" in d_optuna_all["dataset"]:
-        d_data["X_train_val"] = d_data["X_train_val_imputed"]
-        d_data["X_test"] = d_data["X_test_imputed"]
-
-    init_score = np.full_like(
-        d_data["y_train_val"], fl.init_score(d_data["y_train_val"]), dtype=float
-    )
-    fobj = fl.lgb_obj
-
-    # if d_optuna_all["boosting_type"] == "rf":
-    #     init_score = None
-    #     fobj = None
-
-    dataset_train = pandas_to_lgb_dataset(
-        d_data["X_train_val"],
-        d_data["y_train_val"],
-        columns_cat_all=d_data["columns_cat_all"],
-        columns_cat_subset=d_data["columns_cat_subset"],
-        method=d_optuna_all["dataset"],
-        init_score=init_score,
-    )
-
-    model = lgb.train(
-        params,
-        dataset_train,
-        num_boost_round=d_optuna_all["num_boost_round"],
-        verbose_eval=100,
-        fobj=fobj,
-    )
-
-    dicts["y_pred_proba"][key] = special.expit(
-        fl.init_score(d_data["y_train_val"]) + model.predict(d_data["X_test"])
-    )
-
-    dicts["y_pred_proba_train"][key] = special.expit(
-        fl.init_score(d_data["y_train_val"]) + model.predict(d_data["X_train_val"])
-    )
+    dicts["y_pred_proba"][key] = model.predict(d_data["X_test"])
+    dicts["y_pred_proba_train"][key] = model.predict(d_data["X_train_val"])
 
     dicts["models"][key] = model
 
@@ -1655,6 +1723,8 @@ def add_ML_model(
     #     "recall_gain": prg_curve["recall_gain"],
     #     "precision_gain": prg_curve["precision_gain"],
     # }
+
+    return d_optuna_all, d_data
 
 
 #%%
@@ -2044,7 +2114,7 @@ def get_ML_LR_shap_values(dicts, key):
     if "ML" in key:
         X_test = dicts["data"][key]["X_test"]
         X = X_test
-        explainer = shap.TreeExplainer(model)
+        explainer = shap.TreeExplainer(model.model)
 
     elif "LR" in key:
         X_test_imputed = dicts["data"][key]["X_test_imputed"]
@@ -2248,3 +2318,141 @@ def make_feature_importance_curves(data_shap, optimize):
             plt.savefig(figname_png, bbox_inches="tight")
             plt.close("all")
 
+
+
+#%%
+
+def to_int(x):
+    if np.isnan(x):
+        return x
+    else:
+        return int(x)
+
+
+def print_latex_table_categoricals(df_cat):
+
+    latex_table = (
+        r"\begin{table}[]"
+        + "\n"
+        + r"\centering"
+        + "\n"
+        + r"\begin{tabular}{@{}ll@{}}"
+        + "\n"
+        + r"\toprule"
+        + "\n\t"
+        + r"Variable & Frequencies \\"
+        + "\n\t"
+        + r"\midrule"
+        + "\n"
+    )
+
+    for col in df_cat.select_dtypes(include=np.number).columns:
+        if col in ["ID", "year", "hospital", "month", "day_of_week"]:
+            continue
+
+        x = df_cat[col]
+        nunique = x.nunique()
+        order = np.sort(x.unique())
+        unique = x.value_counts(normalize=True, dropna=False)[order] * 100
+        s = ""
+        for k, v in unique.items():
+            s += f"{to_int(k)}: ${v:.1f}" + r"\%$, "
+
+        if col == "hypertension_yes_or_prescription":
+            col = "hypertension"
+
+        latex_table += "\t" + r"\verb|" + col + r"| & " + s[:-2] + r" \\ " + "\n"
+
+    latex_table += (
+        r"\bottomrule" + "\n"
+        r"\end{tabular}"
+        + "\n"
+        + r"\caption{}"
+        + "\n"
+        + r"\label{tab:my-table-categorical}"
+        + "\n"
+        + r"\end{table}"
+        + "\n"
+    )
+
+    print(latex_table)
+
+#%%
+
+def print_latex_table_numericals(df_num):
+
+    latex_table = (
+        r"\begin{table}[]"
+        + "\n"
+        + r"\centering"
+        + "\n"
+        + r"\begin{tabular}{@{}lllllll@{}}"
+        + "\n"
+        + r"\toprule"
+        + "\n\t"
+        + r"Variable & min & mean & median & max & sigma & nans \\"
+        + "\n\t"
+        + r"\midrule"
+        + "\n"
+    )
+
+    for col in df_num.select_dtypes(include=np.number).columns:
+        if col in ["ID", "year", "hospital", "month", "day_of_week"]:
+            continue
+
+        x = df_num[col]
+        s = (
+            f"${np.min(x):.2f}$ & "
+            f"${np.mean(x):.2f}$ & "
+            f"${np.nanmedian(x):.2f}$ & "
+            f"${np.max(x):.2f}$ & "
+            f"${np.std(x):.2f}$ & "
+            f"${np.mean(np.isnan(x))*100:.2f}" + r"\%$, "
+        )
+
+        latex_table += "\t" + r"\verb|" + col + r"| & " + s[:-2] + r" \\ " + "\n"
+
+    latex_table += (
+        r"\bottomrule" + "\n"
+        r"\end{tabular}"
+        + "\n"
+        + r"\caption{}"
+        + "\n"
+        + r"\label{tab:my-table-numerical}"
+        + "\n"
+        + r"\end{table}"
+        + "\n"
+    )
+
+    print(latex_table)
+
+
+#%%
+
+def make_numerical_column_histograms(df, savefig):
+    df_num = df.loc[:, df.nunique() > 10]
+
+    fig, axes = plt.subplots(figsize=(8, 8), ncols=3, nrows=3)
+    axes_flat = axes.flatten()
+
+    for i, col in enumerate(df_num.columns):
+        x = df_num[col]
+        ax = axes_flat[i]
+        ax.hist(x, 30)
+        ax.set(xlabel=col)
+        ax.ticklabel_format(useOffset=False)
+
+    fig.tight_layout()
+
+    if savefig:
+
+        figname = f"./figures/numerical_hists.pdf"
+        Path(figname).parent.mkdir(parents=True, exist_ok=True)
+
+        figname_png = figname.replace(".pdf", ".png").replace(
+            "/numerical", "/pngs/numerical"
+        )
+        Path(figname_png).parent.mkdir(parents=True, exist_ok=True)
+
+        fig.savefig(figname, bbox_inches="tight")
+        fig.savefig(figname_png, dpi=300, bbox_inches="tight")

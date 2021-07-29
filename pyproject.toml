@@ -26,6 +26,9 @@ bayesian-optimization = "^1.2.0"
 rise = "^5.7.1"
 jupyterthemes = "^0.20.0"
 openpyxl = "^3.0.7"
+explainerdashboard = "^0.3.6"
+dill = "^0.3.4"
+kaleido = "0.2.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

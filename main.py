@@ -9,10 +9,12 @@ from collections import defaultdict
 from pathlib import Path
 import joblib
 
-plt.rcParams.update({"text.usetex": True})
+# plt.rcParams.update({"text.usetex": True})
+plt.rcParams.update({"text.usetex": False})
 
 run_all_models = False
-save_stuff = False
+save_stuff = True
+forced = True
 
 y_label = "medical_outcome_new"
 y_label = "medical_outcome_3"
@@ -40,19 +42,21 @@ cfg["optimize"] = optimize  # "TPR", "focal_loss", "AUC", "average_precision"
 file_ROC = Path("data_ROC.joblib")
 file_shap = Path("data_shap.joblib")
 file_df = Path("data_df.joblib")
-file_dfs = Path("data_all.joblib")
+file_data_all = Path("data_all.joblib")
 file_risc_scores = Path("data_risc_scores.joblib")
 
 if (
-    file_ROC.exists()
+    not forced
+    and file_ROC.exists()
     and file_shap.exists()
     and file_df.exists()
+    and file_data_all.exists()
     and file_risc_scores.exists()
 ):
     data_ROC = joblib.load(file_ROC)
     data_shap = joblib.load(file_shap)
     data_df = joblib.load(file_df)
-    data_all = joblib.load(file_dfs)
+    data_all = joblib.load(file_data_all)
     data_risc_scores = joblib.load(file_risc_scores)
 
 else:
@@ -60,7 +64,6 @@ else:
     data_ROC = {}
     data_shap = {}
     data_df = {}
-    data_all = {}
     data_risc_scores = {}
 
     for y_label in ["medical_outcome_new", "medical_outcome_3"]:
@@ -127,7 +130,7 @@ else:
                 name=f"ML__{cfg['optimize']}__{cfg['n_trials']}",
             )
 
-        extra_funcs.add_ML_model(
+        d_optuna_all, d_data = extra_funcs.add_ML_model(
             cfg,
             dicts,
             y_label,
@@ -160,7 +163,7 @@ else:
         key = "ML__exclude_hospital"
         model = dicts["models"][key]
         X_test = dicts["data"][key]["X_test"]
-        explainer = shap.TreeExplainer(model)
+        explainer = shap.TreeExplainer(model.model)
         shap_values = explainer(X_test)
         if len(shap_values.values.shape) == 3:
             df_shap_values = pd.DataFrame(
@@ -197,7 +200,7 @@ else:
         data_ROC[y_label] = extra_funcs.extract_data_ROC(dicts)
         data_shap[y_label] = extra_funcs.extract_data_shap(dicts)
         data_df[y_label] = extra_funcs.extract_data_df(dicts)
-        data_all[y_label] = extra_funcs.extract_all_data_df(dicts)
+        data_all = extra_funcs.extract_all_data_df(dicts)
         data_risc_scores[y_label] = extra_funcs.extract_data_risc_scores(dicts)
 
         if not save_stuff:
@@ -213,13 +216,124 @@ else:
     joblib.dump(data_ROC, file_ROC)
     joblib.dump(data_shap, file_shap)
     joblib.dump(data_df, file_df)
-    joblib.dump(data_all, file_df)
+    joblib.dump(data_all, file_data_all)
     joblib.dump(data_risc_scores, file_risc_scores)
 
     print("\n\n\nfinished")
 
 #%%
 
+df = data_all["X_test"]
+df_cat = df.loc[:, df.nunique() <= 10]
+df_num = df.loc[:, df.nunique() > 10]
+
+
+#%%
+
+
+if False:
+    extra_funcs.print_latex_table_categoricals(df_cat)
+    extra_funcs.print_latex_table_numericals(df_num)
+
+#%%
+
+if False:
+    extra_funcs.make_numerical_column_histograms(df, savefig=True)
+
+
+#%%
+
+x = x
+
+#%%
+
+from sklearn.ensemble import RandomForestClassifier
+from explainerdashboard import ClassifierExplainer, ExplainerDashboard
+from scipy import special
+
+key = "ML__exclude_hospital"
+
+model = dicts["models"][key]
+
+X_test = dicts["data"][key]["X_test"]
+y_test = dicts["data"][key]["y_test"]
+
+X_train_val = dicts["data"][key]["X_train_val"]
+y_train_val = dicts["data"][key]["y_train_val"]
+
+y_pred_proba = dicts["y_pred_proba"][key]
+
+
+shaps = data_shap["medical_outcome_3"]["ML"]
+df_shap = pd.DataFrame(
+    shaps.values,
+    columns=list(X_train_val.columns),
+)
+
+
+# model.save_model("model.txt")
+
+# model.dump_model()
+
+# import joblib
+# import dill
+
+# joblib.dump(model, "model.joblib")
+
+# with open("model.dill", "wb") as dill_file:
+#     dill.dump(model, dill_file)
+
+
+# model = joblib.load("model.joblib")
+
+
+# type(RandomForestClassifier(n_estimators=50, max_depth=10))
+
+# from sklearn.pipeline import Pipeline
+
+# isinstance(RandomForestClassifier(n_estimators=50, max_depth=10), Pipeline)
+
+# import types
+
+
+# def predict_proba(self, X_test, y_train_val=y_train_val, gamma=6.40, alpha=0.78):
+#     fl = extra_funcs.FocalLoss(gamma=gamma, alpha=alpha)
+#     pred = special.expit(fl.init_score(y_train_val) + model.predict(X_test))
+#     return np.array([1 - pred, pred]).T
+
+
+# model.predict_proba = types.MethodType(predict_proba, model)
+
+explainer = ClassifierExplainer(model.get_model(), X_test, y_test, shap="tree")
+# # explainer.dump(f"explainer__{y_label}__{key}.joblib")
+
+d_out = {
+    "X_test": X_test,
+    "y_test": y_test,
+    "X_train_val": X_train_val,
+    "y_train_val": y_train_val,
+    "y_pred_proba": y_pred_proba,
+    "df_shap": df_shap,
+    "d_optuna_all": d_optuna_all,
+    "d_data": d_data,
+}
+
+import pickle
+
+with open(f"explainer__{y_label}__{key}.pkl", "wb") as pkl_file:
+    pickle.dump(d_out, pkl_file)
+
+data_shap
+
+
+# joblib.dump(
+#     d_out,
+#     f"explainer__{y_label}__{key}.joblib",
+# )
+
+# ExplainerDashboard(explainer, simple=True).run()
+
+# %%
 
 if False:
     # if True:
@@ -250,6 +364,7 @@ if False:
 
 
 #%%
+
 
 if False:
 
