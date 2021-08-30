@@ -14,11 +14,11 @@ plt.rcParams.update({"text.usetex": False})
 
 run_all_models = False
 save_stuff = True
-forced = True
+forced = False
 
 y_label = "medical_outcome_new"
 y_label = "medical_outcome_3"
-
+y_labels = ["medical_outcome_new", "medical_outcome_3"]
 
 #%%
 
@@ -28,22 +28,23 @@ cfg = dict()
 # save_plots = False
 if extra_funcs.is_hep():
     cfg["force_HPO"] = False
-    cfg["n_trials"] = 1000
+    cfg["n_trials"] = 100
     cfg["n_jobs"] = 30
 else:
     cfg["force_HPO"] = False
-    cfg["n_trials"] = 1000
-    cfg["n_jobs"] = 0
+    cfg["n_trials"] = 5
+    cfg["n_jobs"] = 6
 
 optimize = "AUC"
 cfg["optimize"] = optimize  # "TPR", "focal_loss", "AUC", "average_precision"
 
 
-file_ROC = Path("data_ROC.joblib")
-file_shap = Path("data_shap.joblib")
-file_df = Path("data_df.joblib")
-file_data_all = Path("data_all.joblib")
-file_risc_scores = Path("data_risc_scores.joblib")
+file_ROC = Path("./data/data_ROC.joblib")
+file_shap = Path("./data/data_shap.joblib")
+file_df = Path("./data/data_df.joblib")
+file_data_all = Path("./data/data_all.joblib")
+file_risc_scores = Path("./data/data_risc_scores.joblib")
+Path("./data").mkdir(parents=True, exist_ok=True)
 
 if (
     not forced
@@ -66,7 +67,8 @@ else:
     data_df = {}
     data_risc_scores = {}
 
-    for y_label in ["medical_outcome_new", "medical_outcome_3"]:
+    for y_label in y_labels:
+        # break
 
         dict_variables = [
             "data",
@@ -158,6 +160,23 @@ else:
             exclude=["hospital", "age"],
         )
 
+        extra_funcs.add_ML_model_no_FL(
+            cfg,
+            dicts,
+            y_label,
+            key="ML__exclude_hospital__no_FL",
+            name=f"ML__exclude_hospital__no_FL__{cfg['optimize']}__{cfg['n_trials']}",
+            exclude=["hospital"],
+        )
+        extra_funcs.add_ML_model_no_FL(
+            cfg,
+            dicts,
+            y_label,
+            key="ML__exclude_hospital__exclude_age__no_FL",
+            name=f"ML__exclude_hospital__exclude_age__no_FL__{cfg['optimize']}__{cfg['n_trials']}",
+            exclude=["hospital", "age"],
+        )
+
         #%%
 
         key = "ML__exclude_hospital"
@@ -195,7 +214,14 @@ else:
             include=list(shap_ordered_columns.index[:10]),
         )
 
-        # print(dicts['data']['ML__exclude_hospital']['X_train_val'].nunique()[shap_ordered_columns.index])
+        extra_funcs.add_ML_model_no_FL(
+            cfg,
+            dicts,
+            y_label,
+            key="ML__top_10__no_FL",
+            name=f"ML__top_10__no_FL__{cfg['optimize']}__{cfg['n_trials']}",
+            include=list(shap_ordered_columns.index[:10]),
+        )
 
         data_ROC[y_label] = extra_funcs.extract_data_ROC(dicts)
         data_shap[y_label] = extra_funcs.extract_data_shap(dicts)
@@ -209,6 +235,7 @@ else:
         df_results, df_results_save = extra_funcs.get_df_results(dicts)
 
         filename = f"./results/results__{y_label}__{optimize}__{cfg['n_trials']}.csv"
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
         df_results_save.to_csv(filename)
 
         df_style = extra_funcs.style_df_results(df_results_save)
@@ -223,9 +250,14 @@ else:
 
 #%%
 
-df = data_all["X_test"]
-df_cat = df.loc[:, df.nunique() <= 10]
-df_num = df.loc[:, df.nunique() > 10]
+x = x
+
+df_test = data_all["X_test"]
+df_cat = df_test.loc[:, df_test.nunique() <= 10]
+df_num = df_test.loc[:, df_test.nunique() > 10]
+
+
+# for y_label in y_labels:
 
 
 #%%

@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from plotly.missing_ipywidgets import FigureWidget
+# from plotly.missing_ipywidgets import FigureWidget
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
@@ -50,8 +50,6 @@ d_columns_rename = {
     "Height": "height",
     "Weight": "weight",
     "Hb": "hb",
-    # "Hb_g_dL": "hb_g_dL",
-    # "Anæmi": "anaemia",  # remove
     "Rygning": "smoking",
     "Alkohol": "alcohol",
     "Gangredskab": "walking_tool",
@@ -65,14 +63,12 @@ d_columns_rename = {
     "Cerebral_attack": "cerebral_attack",
     "Tidl_VTE": "previous_vte",  # blodprop / årebetædndelse
     "Fam_VTE": "family_vte",
-    # "AK_beh": "ak_beh",  # slettes
     "Cancer": "cancer",
     "Nyre": "kidney",  # nyresvigt
     "PsD": "psd",  # psykopharmaka
     "Led": "joint",
     "Alder": "age",
     "BMI": "bmi",
-    # "recept_PsD": "prescription_psd",  # slettes
     "PotentAK": "potent_ak",  # blodfortyndende behandling, renset op, stærkeste medicin
     "Årstal": "year",
     "Hospital": "hospital",
@@ -90,7 +86,6 @@ d_translate = {
     "height": r"$\mathrm{Height}$",
     "weight": r"$\mathrm{Weight}$",
     "hb": r"$\mathrm{HB}$",
-    # "anaemia": r"$\mathrm{Anemia}$",
     "smoking": r"$\mathrm{Smoking}$",
     "alcohol": r"$\mathrm{Alcohol}$",
     "walking_tool": r"$\mathrm{Walking \,\, tool}$",
@@ -104,32 +99,29 @@ d_translate = {
     "cerebral_attack": r"$\mathrm{Cerebral}$",
     "previous_vte": r"$\mathrm{Prev. \,\, VTE}$",
     "family_vte": r"$\mathrm{Fam. \,\, VTE}$",
-    # "ak_beh": r"$\mathrm{AK}$",
     "cancer": r"$\mathrm{Cancer}$",
     "kidney": r"$\mathrm{Kidney}$",
     "psd": r"$\mathrm{PSD}$",
     "joint": r"$\mathrm{Joint}$",
     "age": r"$\mathrm{Age}$",
     "bmi": r"$\mathrm{BMI}$",
-    # "prescription_psd": r"$\mathrm{PSD}$",
     "potent_ak": r"$\mathrm{AK \,\, (potent)}$",
+    # "year": r"$\mathrm{Year}$",
+    # "month": r"$\mathrm{Month}$",
+    # "day_of_week": r"$\mathrm{Week \,\, day}$",
+    # "day_of_month": r"$\mathrm{Day \,\, of \,\, month}$",
     "year": r"$\mathrm{Year}$",
-    "month": r"$\mathrm{Month}$",
-    "day_of_week": r"$\mathrm{Week \,\, day}$",
-    "day_of_month": r"$\mathrm{Day \,\, of \,\, month}$",
-    "year_fraction": r"$\mathrm{Fractional \,\, year}$",
 }
 
 
 def add_date_info_to_df(df):
-    df["month"] = df["date"].dt.month
-    df["day_of_week"] = df["date"].dt.day_of_week
-    df["day_of_month"] = df["date"].dt.day
-    df["year_fraction"] = df["date"].dt.day_of_year / 366 + df["year"]
+    # df["month"] = df["date"].dt.month
+    # df["day_of_week"] = df["date"].dt.day_of_week
+    # df["day_of_month"] = df["date"].dt.day
+    df["year"] = df["date"].dt.day_of_year / 366 + df["year"]
 
 
 def load_entire_dataframe(make_cuts=True):
-
     df = pd.read_csv(
         filename,
         sep=";",
@@ -620,7 +612,7 @@ def plot_monthly_counts(df, y_label):
     return fig, ax
 
 
-import plotly.express as px
+# import plotly.express as px
 
 
 def make_plotly_figure():
@@ -732,7 +724,7 @@ def plot_ROC_AUC(dicts):
 
 #%%
 
-from plotly.subplots import make_subplots
+# from plotly.subplots import make_subplots
 
 
 def plotly_ROC_PR_PRG(dicts, df_results, cfg):
@@ -1462,7 +1454,7 @@ def fl_from_optuna(d_optuna_all, d_data):
 
     return fl, init_score, fobj
 
-def dataset_train_from_optuna(d_optuna_all, d_data, init_score):
+def dataset_train_from_optuna(d_optuna_all, d_data, init_score=None):
 
     if "imputed" in d_optuna_all["dataset"]:
         d_data["X_train_val"] = d_data["X_train_val_imputed"]
@@ -1518,7 +1510,6 @@ class FLModel:
 
 
     def predict(self, X):
-# %%
         return special.expit(
             self.fl.init_score(self.d_data["y_train_val"]) + self.model.predict(X)
         )
@@ -1541,6 +1532,9 @@ class FLModel:
         # def predict_proba(self, X):
         #     pred = self.predict(X)
         #     return np.array([1 - pred, pred]).T
+
+
+
 
 #%%
 
@@ -1729,6 +1723,162 @@ def add_ML_model(
 
 #%%
 
+
+def add_ML_model_no_FL(
+    cfg,
+    dicts,
+    y_label,
+    key,
+    name,
+    exclude=None,
+    include=None,
+    PPF_cut=0.2,
+):
+
+    print(f"\n\nFitting ML model {key} without FL. \n\n")
+
+    cfg = copy(cfg)
+    cfg["exclude"] = exclude
+
+    d_data = get_data(y_label, exclude=exclude, include=include)
+    dicts["data"][key] = d_data
+
+    # define lgb datasets
+    d_lgb_datasets = get_lgb_datasets(d_data)
+
+    def objective(trial):
+
+        boosting_types = ["gbdt", "dart"]
+        boosting_type = trial.suggest_categorical("boosting_type", boosting_types)
+
+        params = {
+            "boosting": boosting_type,
+            "n_jobs": cfg["n_jobs"],
+            "objective": "binary",
+            "first_metric_only": True,
+            "verbosity": -1,
+            "max_depth": trial.suggest_int("max_depth", 2, 63),
+            "num_leaves": trial.suggest_int("num_leaves", 2, 4095),
+            "min_child_weight": trial.suggest_loguniform("min_child_weight", 1e-5, 10),
+            "scale_pos_weight": trial.suggest_uniform("scale_pos_weight", 10.0, 30.0),
+            "is_unbalance": False,  # due to scale_pos_weight being set
+            "subsample": trial.suggest_uniform("subsample", 0.4, 1.0),
+            "colsample_bytree": trial.suggest_uniform("colsample_bytree", 0.4, 1.0),
+            "bagging_freq": 1,
+            "bagging_fraction": trial.suggest_uniform("bagging_fraction", 0.4, 1.0),
+        }
+
+        datasets = list(d_lgb_datasets.keys())
+        s_dataset = trial.suggest_categorical("dataset", datasets)
+
+        # Add a callback for pruning
+        if cfg["optimize"] == "TPR":
+            pruning_callback = LightGBMPruningCallback(trial, "TPR")
+            feval = [lgb_eval_TPR_given_PPF]
+            s_metric = "TPR-mean"
+
+        elif cfg["optimize"] == "AUC":
+            pruning_callback = LightGBMPruningCallback(trial, "auc")
+            feval = None
+            params["metric"] = "auc"
+            s_metric = "auc-mean"
+
+        elif cfg["optimize"] == "average_precision":
+            pruning_callback = LightGBMPruningCallback(trial, "average_precision")
+            feval = None
+            params["metric"] = "average_precision"
+            s_metric = "average_precision-mean"
+
+        else:
+            raise AssertionError(f"{cfg['optimize']} not implemented yet.")
+
+        print(params, s_dataset)
+
+        N_iterations_max = 10_000
+        early_stopping_rounds = 50
+        if boosting_type == "dart":
+            N_iterations_max = 100
+            early_stopping_rounds = None
+
+        cv_res = lgb.cv(
+            params,
+            d_lgb_datasets[s_dataset],
+            num_boost_round=N_iterations_max,
+            early_stopping_rounds=early_stopping_rounds,
+            folds=d_data["cv_splits_validation"],
+            verbose_eval=False,
+            feval=feval,
+            seed=42,
+            callbacks=[pruning_callback],
+        )
+
+        num_boost_round = len(cv_res[s_metric])
+        trial.set_user_attr("num_boost_round", num_boost_round)
+        return cv_res[s_metric][-1]
+
+    filename = f"./models/optuna_study__{y_label}__{name}.pkl"
+
+    if Path(filename).is_file() and not cfg["force_HPO"]:
+        study = joblib.load(filename)
+
+    else:
+        SEED = 42
+        np.random.seed(SEED)
+
+        direction = "maximize"
+
+        study = optuna.create_study(
+            direction=direction,
+            sampler=TPESampler(seed=SEED),
+            pruner=MedianPruner(n_warmup_steps=50),
+        )
+
+        study.optimize(objective, n_trials=cfg["n_trials"], show_progress_bar=True)
+
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(study, filename)
+
+    print(f"Optimizing for {cfg['optimize']}")
+    print(f"Number of finished trials: {len(study.trials)}")
+
+    print("Best trial:")
+    trial = study.best_trial
+
+    print(f"  Value: {trial.value}")
+
+    d_optuna_all = dict(trial.params)
+    d_optuna_all["num_boost_round"] = trial.user_attrs["num_boost_round"]
+
+    print("  Params: ")
+    for key_, value in d_optuna_all.items():
+        print(f"    {key_}: {value}")
+
+
+    # model = FLModel(d_optuna_all, d_data).fit()
+
+    params = params_from_optuna(d_optuna_all)
+    dataset_train = dataset_train_from_optuna(d_optuna_all, d_data)
+
+    model = lgb.train(
+            params,
+            dataset_train,
+            num_boost_round=d_optuna_all["num_boost_round"],
+            verbose_eval=100
+        )
+
+    dicts["y_pred_proba"][key] = model.predict(d_data["X_test"])
+    dicts["y_pred_proba_train"][key] = model.predict(d_data["X_train_val"])
+
+    dicts["models"][key] = model
+
+    compute_performance_measures(dicts, key, PPF_cut=PPF_cut)
+
+    return d_optuna_all, d_data
+
+
+
+#%%
+
 def get_df_results(dicts):
 
     df_results = pd.DataFrame.from_dict(dicts["results"], orient="index")
@@ -1748,10 +1898,13 @@ def get_df_results(dicts):
     df_results_save = df_results.loc[
         [
             "ML__exclude_hospital",
+            "ML__exclude_hospital__no_FL",
             "LR__exclude_hospital",
             "ML__top_10",
+            "ML__top_10__no_FL",
             "LR__top_10",
             "ML__exclude_hospital__exclude_age",
+            "ML__exclude_hospital__exclude_age__no_FL",
             "only_age",
         ],
         metrics,
