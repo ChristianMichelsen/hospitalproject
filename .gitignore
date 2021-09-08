@@ -1,5 +1,7 @@
 old/
 data*
 models/
+figures/
+results/
 *.joblib
 *.pkl
