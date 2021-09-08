@@ -1200,8 +1200,8 @@ def get_df_results(dicts):
         ]
     # fmt:on
 
-    if "ML__exclude_age" in df_results.columns:
-        columns = [
+    if "ML__exclude_age" in df_results.index:
+        index = [
             "ML",
             "LR",
             "ML__top_10",
@@ -1210,7 +1210,7 @@ def get_df_results(dicts):
             "only_age",
         ]
     else:
-        columns = [
+        index = [
             "ML",
             "LR",
             "ML__top_10",
@@ -1219,7 +1219,7 @@ def get_df_results(dicts):
         ]
 
     df_results_save = df_results.loc[
-        columns,
+        index,
         metrics,
     ]
 

@@ -13,10 +13,11 @@ import joblib
 plt.rcParams.update({"text.usetex": False})
 
 run_all_models = False
-# save_stuff = True
-save_stuff = False
+run_all_models = True
+save_stuff = True
+# save_stuff = False
 forced = False
-# forced = True
+forced = True
 
 use_FL = True
 # use_FL = False
@@ -187,10 +188,10 @@ else:
         models[y_label] = dicts["models"]["ML"]
 
         df_results, df_results_save = extra_funcs.get_df_results(dicts)
-
-        filename_df_results = f"./results/results__{y_label}__{cfg_str}.csv"
-        Path(filename_df_results).parent.mkdir(parents=True, exist_ok=True)
-        df_results_save.to_csv(filename_df_results)
+        if save_stuff:
+            filename_df_results = f"./results/results__{y_label}__{cfg_str}.csv"
+            Path(filename_df_results).parent.mkdir(parents=True, exist_ok=True)
+            df_results_save.to_csv(filename_df_results)
 
         df_style = extra_funcs.style_df_results(df_results_save)
 
@@ -207,6 +208,8 @@ print("Finished loading models")
 
 
 #%%
+
+x = x
 
 if save_stuff:
 
