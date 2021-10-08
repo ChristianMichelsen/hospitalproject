@@ -5,3 +5,5 @@ figures/
 results/
 *.joblib
 *.pkl
+*.csv
+*.HEIC
