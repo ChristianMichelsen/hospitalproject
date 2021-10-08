@@ -23,9 +23,9 @@ use_FL = True
 # use_FL = False
 FL_str = "use_FL" if use_FL else "no_FL"
 
-y_label = "medical_outcome_new"
-y_label = "medical_outcome_3"
-y_labels = ["medical_outcome_new", "medical_outcome_3"]
+y_label = "outcome_A"
+y_label = "outcome_B"
+y_labels = ["outcome_A", "outcome_B"]
 
 #%%
 
@@ -85,6 +85,7 @@ else:
     models = {}
 
     for y_label in y_labels:
+
         # break
 
         dict_variables = [
@@ -209,18 +210,23 @@ print("Finished loading models")
 
 #%%
 
-x = x
-
 if save_stuff:
 
     print("Plotting stuff")
 
-    # reload(extra_funcs)
+    reload(extra_funcs)
     extra_funcs.create_length_of_stay_sig_bkg(data_df)
-    extra_funcs.make_ROC_curves(data_risc_scores, data_ROC, cfg_str)
+
+    extra_funcs.make_ROC_curves(
+        data_risc_scores,
+        data_ROC,
+        cfg_str,
+        include_ML__exclude_age=True,
+    )
+
     extra_funcs.make_beeswarm_shap_plots(data_shap, cfg_str)
 
-    # reload(extra_funcs)
+    reload(extra_funcs)
     X_patient = extra_funcs.get_patient(data_all)
 
     extra_funcs.make_shap_plots(
@@ -232,6 +238,80 @@ if save_stuff:
         fontsize=18,
         use_FL=use_FL,
     )
+
+    extra_funcs.make_shap_plots(
+        data_shap,
+        data_risc_scores,
+        models,
+        X_patient,
+        cfg_str,
+        fontsize=18,
+        use_FL=use_FL,
+        suffix="__with_walking_tool",
+    )
+
+    X_patient_no_walking = X_patient.copy()
+    X_patient_no_walking["walking_tool"] = 0
+
+    extra_funcs.make_shap_plots(
+        data_shap,
+        data_risc_scores,
+        models,
+        X_patient_no_walking,
+        cfg_str,
+        fontsize=18,
+        use_FL=use_FL,
+        suffix="__no_walking_tool",
+    )
+
+    X_patient_male = X_patient.copy()
+    X_patient_male["sex"] = 1
+
+    extra_funcs.make_shap_plots(
+        data_shap,
+        data_risc_scores,
+        models,
+        X_patient_male,
+        cfg_str,
+        fontsize=18,
+        use_FL=use_FL,
+        suffix="__male",
+    )
+
+
+A = data_all["df"].query("outcome_A == 1")
+B = data_all["df"].query("outcome_B == 1")
+
+print(len(A))
+print(len(B))
+
+set_A = set(A.index)
+set_B = set(B.index)
+
+set_A.difference(set_B)
+len(set_B.difference(set_A))
+
+
+for y_label in y_labels:
+
+    name = f"{y_label}__ML__{cfg_str}"
+    filename_optuna = f"./models/optuna__{name}.pkl"
+
+    study = joblib.load(filename_optuna)
+
+    print("Best trial:")
+    trial = study.best_trial
+
+    print(f"  Value: {trial.value}")
+
+    d_optuna_all = dict(trial.params)
+    d_optuna_all["num_boost_round"] = trial.user_attrs["num_boost_round"]
+
+    print("  Params: ")
+    for key_, value in d_optuna_all.items():
+        print(f"    {key_}: {value}")
+
+
 
 print("\n\n\nfinished")
 

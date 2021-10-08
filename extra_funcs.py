@@ -42,7 +42,7 @@ def is_hep():
 # filename = "Dtasæt_NBI_Predict_PrimæreTXA_16_17_MASTER_ WORK.csv"
 # filename = "Dtasætround2_NBI_Predict_PrimæreTXA_14_17_MASTER_WORK_1_Hb.csv"
 # filename = "Dtasætround2_NBI_Predict_PrimæreTXA_14_17_MASTER_WORK_1_Hb_LOS.csv"
-filename = "Dtasætround3_NBI_Predict_PrimæreTXA_14_17_M ASTER_WORK_1_Hb.csv"
+filename_csv = "Dtasætround3_NBI_Predict_PrimæreTXA_14_17_M ASTER_WORK_1_Hb.csv"
 
 d_columns_rename = {
     "D_ODTO": "date",
@@ -74,8 +74,8 @@ d_columns_rename = {
     "Årstal": "year",
     "Hospital": "hospital",
     "Medical_outcome": "medical_outcome_old",  # more or less than 4 days in hospital (or re-indlæggelse)
-    "Medical_outcome_inkl_obs_diag": "medical_outcome_new",  # more or less than 4 days in hospital (or re-indlæggelse)
-    "Medicaloutcome3": "medical_outcome_3",
+    "Medical_outcome_inkl_obs_diag": "outcome_A",  # more or less than 4 days in hospital (or re-indlæggelse)
+    "Medicaloutcome3": "outcome_B",
     "F_post_op_liggetid": "length_of_stay",
     "Risikoscore1": "risc_score1",
 }
@@ -124,7 +124,7 @@ def add_date_info_to_df(df):
 
 def load_entire_dataframe(make_cuts=True):
     df = pd.read_csv(
-        filename,
+        filename_csv,
         sep=";",
         decimal=",",
         na_values=" ",
@@ -150,8 +150,8 @@ def df_to_X(df):
         "Anæmi",
         "AK_beh",
         "recept_PsD",
-        "medical_outcome_new",
-        "medical_outcome_3",
+        "outcome_A",
+        "outcome_B",
         "medical_outcome_old",
         "risc_score1",
         "cutoff6",
@@ -373,8 +373,8 @@ def impute(X, imputer=None, round_to_int=True):
 def create_length_of_stay_sig_bkg(data_df):
 
     titles = [
-        r"$\mathrm{medical \, \, outcome \,\, new}$",
-        r"$\mathrm{medical \, \, outcome \,\, 3}$",
+        r"$\mathrm{Outcome \,\, A}$",
+        r"$\mathrm{Outcome \,\, B}$",
     ]
 
     for i_ax, (y_label, df) in enumerate(data_df.items()):
@@ -396,18 +396,18 @@ def create_length_of_stay_sig_bkg(data_df):
 
         ax.hist(
             df_sig.length_of_stay,
-            label="Signal",
+            label="Positive",
             **kwargs,
         )
         ax.hist(
             df_bkg.length_of_stay,
-            label="Background",
+            label="Negative",
             **kwargs,
         )
 
         ax.set(
-            xlabel="Recovery Time [days]",
-            ylabel="Normalized Counts",
+            xlabel="Length of stay [days]",
+            ylabel="Counts (normalized)",
             # xlim=(0 - 0.5, N_days - 0.5),
             xlim=(0, N_days),
         )
@@ -421,7 +421,7 @@ def create_length_of_stay_sig_bkg(data_df):
         filename = f"./figures/LOS__{y_label}"
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(filename + ".pdf", dpi=300)
-        fig.savefig(filename.replace("figures/", "figures/pngs") + ".png", dpi=1200)
+        fig.savefig(filename.replace("figures/", "figures/pngs/") + ".png", dpi=600)
 
 
 def extract_data_risc_scores(dicts):
@@ -537,6 +537,18 @@ def compute_TPR(d_cm):
 
 
 @njit
+def _compute_cutoffs(y_pred_proba):
+    x = np.sort(y_pred_proba)
+    midpoints = (x[1:] + x[:-1]) / 2
+    cutoffs = np.zeros(len(midpoints) + 2)
+    for i, midpoint in enumerate(midpoints):
+        cutoffs[i + 1] = midpoint
+    cutoffs[-1] = 1
+    # cutoffs = np.append(cutoffs, 1)
+    return cutoffs
+
+
+@njit
 def nb_compute_cutoff_PPF_TPR(
     y_true, y_pred_proba, minimum=-1, maximum=-1, N=100, PPF_cut=0.2
 ):
@@ -547,13 +559,22 @@ def nb_compute_cutoff_PPF_TPR(
     if maximum == -1:
         maximum = np.nanmax(y_pred_proba)
 
-    cutoffs = np.linspace(minimum, maximum, N)
+    if N < len(y_pred_proba):
+        cutoffs = np.linspace(minimum, maximum, N)
+    else:
+        # x = np.sort(y_pred_proba)
+        # midpoints = (x[1:] + x[:-1]) / 2
+        # cutoffs = np.insert(midpoints, 0, 0)
+        # cutoffs = np.append(cutoffs, 1)
+        cutoffs = _compute_cutoffs(y_pred_proba)
+
     for cutoff in cutoffs:
         y_pred = y_pred_proba >= cutoff
         d_cm = compute_confusion_matrix(y_true, y_pred)
         PPF = compute_PPF(d_cm)
         if PPF < PPF_cut:
             TPR = compute_TPR(d_cm)
+            # break
             return cutoff, PPF, TPR
 
     return cutoff, PPF, np.nan
@@ -654,7 +675,7 @@ def compute_performance_measures(dicts, key, cutoff=None, PPF_cut=0.2):
     y_pred_proba = dicts["y_pred_proba"][key]
 
     if cutoff is None:
-        cutoff = compute_cutoff(y_true, y_pred_proba, N=1000, PPF_cut=PPF_cut)
+        cutoff = compute_cutoff(y_true, y_pred_proba, N=100_000, PPF_cut=PPF_cut)
 
     y_pred = y_pred_proba >= cutoff
 
@@ -1305,7 +1326,7 @@ def compute_suitable_area(d_ROC, PPF_cut_min=0.15, PPF_cut_max=0.25):
     cutoff = compute_cutoff(
         y_true,
         y_pred_proba,
-        N=1000,
+        N=100_000,
         PPF_cut=PPF_cut_min,
     )
     y_pred = y_pred_proba >= cutoff
@@ -1314,7 +1335,7 @@ def compute_suitable_area(d_ROC, PPF_cut_min=0.15, PPF_cut_max=0.25):
     cutoff = compute_cutoff(
         y_true,
         y_pred_proba,
-        N=1000,
+        N=100_000,
         PPF_cut=PPF_cut_max,
     )
     y_pred = y_pred_proba >= cutoff
@@ -1344,6 +1365,7 @@ def plot_ROC(
     ax_inset = ax.inset_axes([0.53, 0.08, 0.4, 0.65])
 
     for i_model, key in enumerate(keys):
+
         # break
 
         kwargs_point = dict(
@@ -1487,12 +1509,12 @@ def plot_risc_score(ax, d_risc_scores, risc_key):
         lw=2,
     )
 
-    ax.hist(y_pred_proba[y_test == 1], label="signal", **kwargs)
-    ax.hist(y_pred_proba[y_test != 1], label="background", **kwargs)
-    ax.axvline(cutoff, ls="--", color="k", label="Cutoff")
+    ax.hist(y_pred_proba[y_test == 1], label="Positive", **kwargs)
+    ax.hist(y_pred_proba[y_test != 1], label="Negative", **kwargs)
+    ax.axvline(cutoff, ls="--", color="k", label="Threshold")
 
     ax.legend()
-    ax.set(xlabel="Risc Score", ylabel="Normalized Counts", xlim=xlim)
+    ax.set(xlabel="Risc Score", ylabel="Counts (normalised)", xlim=xlim)
 
     for item in (
         [ax.title, ax.xaxis.label, ax.yaxis.label]
@@ -1502,13 +1524,20 @@ def plot_risc_score(ax, d_risc_scores, risc_key):
         item.set_fontsize(20)
 
 
-def make_risc_ROC_curve(d_risc_scores, d_ROC, PPF_cut_min, PPF_cut_max):
+def make_risc_ROC_curve(
+    d_risc_scores,
+    d_ROC,
+    PPF_cut_min,
+    PPF_cut_max,
+    include_ML__exclude_age=False,
+):
 
     keys = [
         "ML",
         "LR",
         "ML__top_10",
         "LR__top_10",
+        "ML__exclude_age",
         "only_age",
     ]
 
@@ -1517,8 +1546,10 @@ def make_risc_ROC_curve(d_risc_scores, d_ROC, PPF_cut_min, PPF_cut_max):
         r"$\mathrm{LR}$",
         r"$\mathrm{ML10}$",
         r"$\mathrm{LR10}$",
+        r"$\mathrm{ML-NoAge}$",
         r"$\mathrm{Age}$",
     ]
+
     markers = [
         "s",
         "o",
@@ -1527,6 +1558,19 @@ def make_risc_ROC_curve(d_risc_scores, d_ROC, PPF_cut_min, PPF_cut_max):
         "s",
         "^",
     ]
+
+    if not include_ML__exclude_age:
+        keys.remove("ML__exclude_age")
+        names.remove(r"$\mathrm{ML-NoAge}$")
+
+        markers = [
+            "s",
+            "o",
+            "s",
+            "o",
+            "^",
+        ]
+
     # colors = ["#377eb8", "#e41a1c", "#84BDEB", "#f5abc9", "#048b00"]
     colors = [
         "#096B91",
@@ -1542,12 +1586,27 @@ def make_risc_ROC_curve(d_risc_scores, d_ROC, PPF_cut_min, PPF_cut_max):
 
     risc_key = "ML"
     plot_risc_score(ax_risc, d_risc_scores, risc_key)
-    plot_ROC(fig, ax_ROC, d_ROC, PPF_cut_min, PPF_cut_max, keys, names, colors, markers)
+    plot_ROC(
+        fig,
+        ax_ROC,
+        d_ROC,
+        PPF_cut_min,
+        PPF_cut_max,
+        keys,
+        names,
+        colors,
+        markers,
+    )
 
     return fig
 
 
-def make_ROC_curves(data_risc_scores, data_ROC, cfg_str):
+def make_ROC_curves(
+    data_risc_scores,
+    data_ROC,
+    cfg_str,
+    include_ML__exclude_age=False,
+):
 
     # PPF_cut_min, PPF_cut_max = 0.125, 0.275
 
@@ -1565,6 +1624,7 @@ def make_ROC_curves(data_risc_scores, data_ROC, cfg_str):
                 d_ROC,
                 PPF_cut_min=PPF_cut_min,
                 PPF_cut_max=PPF_cut_max,
+                include_ML__exclude_age=include_ML__exclude_age,
             )
 
             figname = f"./figures/ROC__{y_label}__{cfg_str}__{PPF_cut_min:.3f}__{PPF_cut_max:.3f}.pdf"
@@ -1831,6 +1891,7 @@ def make_shap_plots(
     cfg_str,
     fontsize=16,
     use_FL=False,
+    suffix="",
 ):
 
     colors = ["#377eb8", "#e41a1c"]
@@ -1863,9 +1924,9 @@ def make_shap_plots(
 
         fig.tight_layout()
 
-        filename = f"./figures/shap__{y_label}__{cfg_str}"
+        filename = f"./figures/shap__{y_label}__{cfg_str}{suffix}"
         fig.savefig(filename + ".pdf")
-        fig.savefig(filename.replace("figures/", "figures/pngs/") + ".png", dpi=1200)
+        fig.savefig(filename.replace("figures/", "figures/pngs/") + ".png", dpi=200)
 
         # figs.append(fig)
         # plt.close("all")
