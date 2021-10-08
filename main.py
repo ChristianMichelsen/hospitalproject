@@ -12,12 +12,12 @@ import joblib
 # plt.rcParams.update({"text.usetex": True})
 plt.rcParams.update({"text.usetex": False})
 
-run_all_models = False
+# run_all_models = False
 run_all_models = True
 save_stuff = True
 # save_stuff = False
 forced = False
-forced = True
+# forced = True
 
 use_FL = True
 # use_FL = False
@@ -38,7 +38,7 @@ if extra_funcs.is_hep():
     cfg["n_jobs"] = 30
 else:
     cfg["force_HPO"] = False
-    cfg["n_trials"] = 1000
+    cfg["n_trials"] = 10
     cfg["n_jobs"] = 6
 
 optimize = "AUC"  # "average_precision"
@@ -310,7 +310,6 @@ for y_label in y_labels:
     print("  Params: ")
     for key_, value in d_optuna_all.items():
         print(f"    {key_}: {value}")
-
 
 
 print("\n\n\nfinished")

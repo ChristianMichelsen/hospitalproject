@@ -42,7 +42,9 @@ def is_hep():
 # filename = "Dtasæt_NBI_Predict_PrimæreTXA_16_17_MASTER_ WORK.csv"
 # filename = "Dtasætround2_NBI_Predict_PrimæreTXA_14_17_MASTER_WORK_1_Hb.csv"
 # filename = "Dtasætround2_NBI_Predict_PrimæreTXA_14_17_MASTER_WORK_1_Hb_LOS.csv"
-filename_csv = "Dtasætround3_NBI_Predict_PrimæreTXA_14_17_M ASTER_WORK_1_Hb.csv"
+# filename_csv = "Dtasætround3_NBI_Predict_PrimæreTXA_14_17_M ASTER_WORK_1_Hb.csv"
+filename_csv = "NBI_Predict_TXA_recepter.csv"
+
 
 d_columns_rename = {
     "D_ODTO": "date",
@@ -78,6 +80,14 @@ d_columns_rename = {
     "Medicaloutcome3": "outcome_B",
     "F_post_op_liggetid": "length_of_stay",
     "Risikoscore1": "risc_score1",
+    "Antirheumatika": "antirheumatika",
+    "Gruppering_AK": "group_ak",
+    "Grupperinger_Card": "group_card",
+    "Grupperinger_Psyk": "group_psych",
+    "Grupperinger_Resp": "group_resp",
+    "Steroid": "steroid",
+    "Total_antal_Recepter": "N_total_prescriptions",
+    "kolesterolmedicin": "cholesterol_medicine",
 }
 
 
@@ -122,7 +132,26 @@ def add_date_info_to_df(df):
     df["year"] = df["date"].dt.day_of_year / 366 + df["year"]
 
 
+def make_variables_ints(df):
+
+    variables = [
+        "group_card",
+        "group_resp",
+        "group_psych",
+        "group_ak",
+        "steroid",
+        "cholesterol_medicine",
+        "antirheumatika",
+        "N_total_prescriptions",
+    ]
+
+    df[variables] = df[variables].fillna(-1).astype(int)
+
+    return df
+
+
 def load_entire_dataframe(make_cuts=True):
+
     df = pd.read_csv(
         filename_csv,
         sep=";",
@@ -132,8 +161,9 @@ def load_entire_dataframe(make_cuts=True):
     ).rename(columns=d_columns_rename)
 
     add_date_info_to_df(df)
+    df = make_variables_ints(df)
 
-    df["ID"] = df["Komb"].str[:8].astype(int)
+    # df["ID"] = df["Komb"].str[:8].astype(int)
 
     if make_cuts:
         df = df.query("30 <= weight <= 250 & 100 <= height <= 210").reset_index(
@@ -144,8 +174,9 @@ def load_entire_dataframe(make_cuts=True):
 
 
 def df_to_X(df):
+
     drop_columns = [
-        "Komb",
+        # "Komb",
         "date",
         "Anæmi",
         "AK_beh",
@@ -156,7 +187,7 @@ def df_to_X(df):
         "risc_score1",
         "cutoff6",
         "cutoff5",
-        "ID",
+        # "ID",
         "length_of_stay",
         "hospital",
     ]
@@ -180,6 +211,7 @@ def get_numerical_and_categorical_features(X):
         "age",
         "bmi",
         "year",
+        "N_total_prescriptions",
     ]
     categorical_features = [col for col in X.columns if col not in numerical_features]
 
