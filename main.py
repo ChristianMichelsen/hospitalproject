@@ -45,7 +45,6 @@ optimize = "AUC"  # "average_precision"
 cfg["optimize"] = optimize  # "TPR", "focal_loss", "AUC", "average_precision"
 cfg["FL_str"] = FL_str
 
-
 cfg_str = extra_funcs.cfg_to_str(cfg)
 
 file_ROC = Path(f"./data/data_ROC__{cfg_str}.joblib")
@@ -56,6 +55,7 @@ file_risc_scores = Path(f"./data/data_risc_scores__{cfg_str}.joblib")
 file_top_10_columns = Path(f"./data/top_10_columns__{cfg_str}.joblib")
 file_models = Path(f"./data/models__{cfg_str}.joblib")
 Path("./data").mkdir(parents=True, exist_ok=True)
+Path("./figures/pngs").mkdir(parents=True, exist_ok=True)
 
 if (
     not forced
@@ -135,8 +135,8 @@ else:
             cfg,
             dicts,
             y_label,
-            use_FL=use_FL,
             key=f"ML",
+            use_FL=use_FL,
             name=f"{y_label}__ML__{cfg_str}",
         )
 

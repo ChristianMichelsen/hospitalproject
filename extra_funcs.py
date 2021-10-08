@@ -1,13 +1,11 @@
 import numpy as np
 import pandas as pd
-
-# from plotly.missing_ipywidgets import FigureWidget
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from pathlib import Path
-from sklearn.experimental import enable_iterative_imputer
-from sklearn.impute import SimpleImputer, IterativeImputer, MissingIndicator
+from copy import copy
+from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
 import lightgbm as lgb
 import shap
@@ -117,11 +115,18 @@ d_translate = {
     "age": r"$\mathrm{Age}$",
     "bmi": r"$\mathrm{BMI}$",
     "potent_ak": r"$\mathrm{AK \,\, (potent)}$",
-    # "year": r"$\mathrm{Year}$",
+    "year": r"$\mathrm{Year}$",
     # "month": r"$\mathrm{Month}$",
     # "day_of_week": r"$\mathrm{Week \,\, day}$",
     # "day_of_month": r"$\mathrm{Day \,\, of \,\, month}$",
-    "year": r"$\mathrm{Year}$",
+    "antirheumatika": r"$\mathrm{Antirheumatika}$",
+    "group_ak": r"$\mathrm{AK \,\, (group)}$",
+    "group_card": r"$\mathrm{Card \,\, (group)}$",
+    "group_psych": r"$\mathrm{Psych \,\, (group)}$",
+    "group_resp": r"$\mathrm{Resp \,\, (group)}$",
+    "steroid": r"$\mathrm{Steroid}$",
+    "N_total_prescriptions": r"$N_\mathrm{prescriptions}$",
+    "cholesterol_medicine": r"$\mathrm{cholesterol \,\, (medicine)}$",
 }
 
 
@@ -754,6 +759,22 @@ def compute_performance_measures(dicts, key, cutoff=None, PPF_cut=0.2):
 #%%
 
 
+def get_train_test_splits(df_train_val, time_intervals_val):
+
+    df = df_train_val
+
+    df["idx"] = range(len(df))
+
+    cv_splits = []
+    for i, interval in enumerate(time_intervals_val[:-1]):
+        # break
+        idx_train = df["idx"][df["date"] < interval]
+        mask_test = (interval <= df["date"]) & (df["date"] < time_intervals_val[i + 1])
+        idx_test = df["idx"][mask_test]
+        cv_splits.append((idx_train.values, idx_test.values))
+    return cv_splits
+
+
 def get_data(y_label, exclude=None, include=None):
 
     if exclude is not None and include is not None:
@@ -780,15 +801,15 @@ def get_data(y_label, exclude=None, include=None):
 
     # test on 2017
     mask_test = "2017-01-01" <= df["date"]
-    df_test = df.loc[mask_test]
-    X_test = X.loc[mask_test]
-    y_test = y.loc[mask_test]
+    df_test = df.loc[mask_test].copy()
+    X_test = X.loc[mask_test].copy()
+    y_test = y.loc[mask_test].copy()
 
     # train and validate on < 2017
     mask_train_val = df["date"] < "2017-01-01"
-    df_train_val = df.loc[mask_train_val]
-    X_train_val = X.loc[mask_train_val]
-    y_train_val = y.loc[mask_train_val]
+    df_train_val = df.loc[mask_train_val].copy()
+    X_train_val = X.loc[mask_train_val].copy()
+    y_train_val = y.loc[mask_train_val].copy()
 
     # 6 validation time intervals of 2 months in 2016
     time_intervals_val = [f"2016-{i:02d}-01" for i in range(1, 12, 2)] + ["2017-01-01"]
@@ -909,20 +930,6 @@ import joblib
 
 
 #%%
-
-from copy import copy
-from pathlib import Path
-
-
-def get_train_test_splits(df, time_intervals):
-    cv_splits = []
-    for i, interval in enumerate(time_intervals[:-1]):
-        idx_train = df.index[df["date"] < interval]
-        mask_test = (interval <= df["date"]) & (df["date"] < time_intervals[i + 1])
-        idx_test = df.index[mask_test]
-        cv_splits.append((idx_train.values, idx_test.values))
-    return cv_splits
-
 
 #%%
 
@@ -2028,6 +2035,14 @@ def get_patient(data_all):
         "age": 70,  # Age (70 years),
         "potent_ak": 0,
         "year": 2017.5,
+        "group_card": 0,
+        "group_resp": 0,
+        "group_psych": 0,
+        "group_ak": 0,
+        "steroid": 0,
+        "cholesterol_medicine": 0,
+        "antirheumatika": 0,
+        "N_total_prescriptions": 0,
     }
 
     d_patient["bmi"] = d_patient["weight"] / (d_patient["height"] / 100) ** 2
