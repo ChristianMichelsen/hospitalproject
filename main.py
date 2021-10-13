@@ -15,17 +15,17 @@ plt.rcParams.update({"text.usetex": False})
 # run_all_models = False
 run_all_models = True
 save_stuff = True
-# save_stuff = False
-forced = False
-# forced = True
+plot_stuff = True
+forced = True
 
 use_FL = True
-# use_FL = False
 FL_str = "use_FL" if use_FL else "no_FL"
 
 y_label = "outcome_A"
 y_label = "outcome_B"
 y_labels = ["outcome_A", "outcome_B"]
+
+PPF = 0.1
 
 #%%
 
@@ -38,22 +38,26 @@ if extra_funcs.is_hep():
     cfg["n_jobs"] = 30
 else:
     cfg["force_HPO"] = False
-    cfg["n_trials"] = 10
+    cfg["n_trials"] = 1000
     cfg["n_jobs"] = 6
 
 optimize = "AUC"  # "average_precision"
+# optimize = "average_precision"  #
 cfg["optimize"] = optimize  # "TPR", "focal_loss", "AUC", "average_precision"
 cfg["FL_str"] = FL_str
+cfg["PPF"] = PPF
 
 cfg_str = extra_funcs.cfg_to_str(cfg)
+cfg_str_with_PPF = f"{cfg_str}__{PPF}"
 
-file_ROC = Path(f"./data/data_ROC__{cfg_str}.joblib")
-file_shap = Path(f"./data/data_shap__{cfg_str}.joblib")
-file_df = Path(f"./data/data_df__{cfg_str}.joblib")
-file_data_all = Path(f"./data/data_all__{cfg_str}.joblib")
-file_risc_scores = Path(f"./data/data_risc_scores__{cfg_str}.joblib")
-file_top_10_columns = Path(f"./data/top_10_columns__{cfg_str}.joblib")
-file_models = Path(f"./data/models__{cfg_str}.joblib")
+
+file_ROC = Path(f"./data/data_ROC__{cfg_str_with_PPF}.joblib")
+file_shap = Path(f"./data/data_shap__{cfg_str_with_PPF}.joblib")
+file_df = Path(f"./data/data_df__{cfg_str_with_PPF}.joblib")
+file_data_all = Path(f"./data/data_all__{cfg_str_with_PPF}.joblib")
+file_risc_scores = Path(f"./data/data_risc_scores__{cfg_str_with_PPF}.joblib")
+file_top_10_columns = Path(f"./data/top_10_columns__{cfg_str_with_PPF}.joblib")
+file_models = Path(f"./data/models__{cfg_str_with_PPF}.joblib")
 Path("./data").mkdir(parents=True, exist_ok=True)
 Path("./figures/pngs").mkdir(parents=True, exist_ok=True)
 
@@ -113,72 +117,88 @@ else:
             df_table.to_csv(filename_table)
 
         # reload(extra_funcs)
-        extra_funcs.add_model_age_only(dicts, y_label, key="only_age")
-        extra_funcs.add_model_risc_score1(dicts, y_label, key="risc_score1")
-
-        extra_funcs.add_model_LR(
-            dicts,
-            y_label,
-            key="LR",
+        extra_funcs.add_model_age_only(
+            dicts=dicts,
+            y_label=y_label,
+            key="only_age",
+            PPF_cut=PPF,
+        )
+        extra_funcs.add_model_risc_score1(
+            dicts=dicts,
+            y_label=y_label,
+            key="risc_score1",
+            PPF_cut=PPF,
         )
 
         extra_funcs.add_model_LR(
-            dicts,
-            y_label,
+            dicts=dicts,
+            y_label=y_label,
+            key="LR",
+            PPF_cut=PPF,
+        )
+
+        extra_funcs.add_model_LR(
+            dicts=dicts,
+            y_label=y_label,
             key="LR__exclude_age",
             exclude="age",
+            PPF_cut=PPF,
         )
 
         #%%
 
         extra_funcs.add_ML_model(
-            cfg,
-            dicts,
-            y_label,
+            cfg=cfg,
+            dicts=dicts,
+            y_label=y_label,
             key=f"ML",
             use_FL=use_FL,
             name=f"{y_label}__ML__{cfg_str}",
+            PPF_cut=PPF,
         )
 
         if run_all_models:
             extra_funcs.add_ML_model(
-                cfg,
-                dicts,
-                y_label,
+                cfg=cfg,
+                dicts=dicts,
+                y_label=y_label,
                 use_FL=use_FL,
                 key="ML__exclude_age",
                 name=f"{y_label}__ML__exclude_age__{cfg_str}",
                 exclude="age",
+                PPF_cut=PPF,
             )
 
         #%%
 
         shap_ordered_columns = extra_funcs.get_shap_ordered_columns(
-            dicts,
+            dicts=dicts,
             key="ML",
             use_FL=use_FL,
         )
 
         extra_funcs.add_ML_model(
-            cfg,
-            dicts,
-            y_label,
+            cfg=cfg,
+            dicts=dicts,
+            y_label=y_label,
             use_FL=use_FL,
             key="ML__top_10",
             name=f"{y_label}__ML__top_10__{cfg_str}",
             include=list(shap_ordered_columns.index[:10]),
+            PPF_cut=PPF,
         )
 
         extra_funcs.add_model_LR(
-            dicts,
-            y_label,
+            dicts=dicts,
+            y_label=y_label,
             key="LR__top_10",
             include=list(shap_ordered_columns.index[:10]),
+            PPF_cut=PPF,
         )
 
         data_ROC[y_label] = extra_funcs.extract_data_ROC(dicts)
         data_shap[y_label] = extra_funcs.extract_data_shap(
-            dicts,
+            dicts=dicts,
             use_FL=use_FL,
             use_test=False,
         )
@@ -190,7 +210,9 @@ else:
 
         df_results, df_results_save = extra_funcs.get_df_results(dicts)
         if save_stuff:
-            filename_df_results = f"./results/results__{y_label}__{cfg_str}.csv"
+            filename_df_results = (
+                f"./results/results__{y_label}__{cfg_str_with_PPF}.csv"
+            )
             Path(filename_df_results).parent.mkdir(parents=True, exist_ok=True)
             df_results_save.to_csv(filename_df_results)
 
@@ -204,13 +226,14 @@ else:
     joblib.dump(top_10_columns, file_top_10_columns)
     joblib.dump(models, file_models)
 
-
+print("\n\n\n")
 print("Finished loading models")
+print("\n\n\n")
 
 
 #%%
 
-if save_stuff:
+if plot_stuff:
 
     print("Plotting stuff")
 
@@ -220,64 +243,68 @@ if save_stuff:
     extra_funcs.make_ROC_curves(
         data_risc_scores,
         data_ROC,
-        cfg_str,
+        cfg_str_with_PPF,
         include_ML__exclude_age=True,
+        cuts=[(0.15, 0.25)],
     )
 
-    extra_funcs.make_beeswarm_shap_plots(data_shap, cfg_str)
+    extra_funcs.make_beeswarm_shap_plots(data_shap, cfg_str_with_PPF)
 
     reload(extra_funcs)
     X_patient = extra_funcs.get_patient(data_all)
 
-    extra_funcs.make_shap_plots(
-        data_shap,
-        data_risc_scores,
-        models,
-        X_patient,
-        cfg_str,
-        fontsize=18,
-        use_FL=use_FL,
-    )
+    if False:
 
-    extra_funcs.make_shap_plots(
-        data_shap,
-        data_risc_scores,
-        models,
-        X_patient,
-        cfg_str,
-        fontsize=18,
-        use_FL=use_FL,
-        suffix="__with_walking_tool",
-    )
+        extra_funcs.make_shap_plots(
+            data_shap,
+            data_risc_scores,
+            models,
+            X_patient,
+            cfg_str_with_PPF,
+            fontsize=18,
+            use_FL=use_FL,
+        )
 
-    X_patient_no_walking = X_patient.copy()
-    X_patient_no_walking["walking_tool"] = 0
+        extra_funcs.make_shap_plots(
+            data_shap,
+            data_risc_scores,
+            models,
+            X_patient,
+            cfg_str_with_PPF,
+            fontsize=18,
+            use_FL=use_FL,
+            suffix="__with_walking_tool",
+        )
 
-    extra_funcs.make_shap_plots(
-        data_shap,
-        data_risc_scores,
-        models,
-        X_patient_no_walking,
-        cfg_str,
-        fontsize=18,
-        use_FL=use_FL,
-        suffix="__no_walking_tool",
-    )
+        X_patient_no_walking = X_patient.copy()
+        X_patient_no_walking["walking_tool"] = 0
 
-    X_patient_male = X_patient.copy()
-    X_patient_male["sex"] = 1
+        extra_funcs.make_shap_plots(
+            data_shap,
+            data_risc_scores,
+            models,
+            X_patient_no_walking,
+            cfg_str_with_PPF,
+            fontsize=18,
+            use_FL=use_FL,
+            suffix="__no_walking_tool",
+        )
 
-    extra_funcs.make_shap_plots(
-        data_shap,
-        data_risc_scores,
-        models,
-        X_patient_male,
-        cfg_str,
-        fontsize=18,
-        use_FL=use_FL,
-        suffix="__male",
-    )
+        X_patient_male = X_patient.copy()
+        X_patient_male["sex"] = 1
 
+        extra_funcs.make_shap_plots(
+            data_shap,
+            data_risc_scores,
+            models,
+            X_patient_male,
+            cfg_str_with_PPF,
+            fontsize=18,
+            use_FL=use_FL,
+            suffix="__male",
+        )
+
+plt.close("all")
 
 A = data_all["df"].query("outcome_A == 1")
 B = data_all["df"].query("outcome_B == 1")

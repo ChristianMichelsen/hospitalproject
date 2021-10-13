@@ -134,46 +134,50 @@ def add_date_info_to_df(df):
     # df["month"] = df["date"].dt.month
     # df["day_of_week"] = df["date"].dt.day_of_week
     # df["day_of_month"] = df["date"].dt.day
-    df["year"] = df["date"].dt.day_of_year / 366 + df["year"]
-
-
-def make_variables_ints(df):
-
-    variables = [
-        "group_card",
-        "group_resp",
-        "group_psych",
-        "group_ak",
-        "steroid",
-        "cholesterol_medicine",
-        "antirheumatika",
-        "N_total_prescriptions",
-    ]
-
-    df[variables] = df[variables].fillna(-1).astype(int)
-
+    df.loc[:, "year"] = df["date"].dt.day_of_year / 366 + df["date"].dt.year
     return df
 
 
-def load_entire_dataframe(make_cuts=True):
+non_integer_columns = ["hb", "bmi", "year", "date"]
 
-    df = pd.read_csv(
-        filename_csv,
-        sep=";",
-        decimal=",",
-        na_values=" ",
-        parse_dates=["D_ODTO"],
-    ).rename(columns=d_columns_rename)
 
-    add_date_info_to_df(df)
-    df = make_variables_ints(df)
+def make_variables_ints(df):
+    variables = [col for col in df.columns if not col in non_integer_columns]
+    df[variables] = df[variables].astype(int)
+    return df
 
-    # df["ID"] = df["Komb"].str[:8].astype(int)
 
-    if make_cuts:
-        df = df.query("30 <= weight <= 250 & 100 <= height <= 210").reset_index(
-            drop=True
-        )
+def remove_date_nans(df):
+    return df[~df["date"].isna()]
+
+
+def add_cuts(df):
+    return df.query("30 <= weight <= 250 & 100 <= height <= 210")
+
+
+def parse_dates(df):
+    df.loc[:, "D_ODTO"] = pd.to_datetime(df["D_ODTO"], format="%m/%d/%Y 0:00:00")
+    return df
+
+
+def remove_to_much_nans(df):
+    mask = df.isna().sum(axis=1) <= 5
+    return df[mask]
+
+
+def load_entire_dataframe(filename=filename_csv):
+
+    df = (
+        pd.read_csv(filename, sep=";", decimal=",", na_values=" ")
+        .pipe(parse_dates)
+        .rename(columns=d_columns_rename)
+        .sort_values(by=["date", "height", "bmi", "hb"])
+        .pipe(add_cuts)
+        .pipe(remove_date_nans)
+        .pipe(add_date_info_to_df)
+        .pipe(remove_to_much_nans)
+        .reset_index(drop=True)
+    )
 
     return df
 
@@ -181,7 +185,6 @@ def load_entire_dataframe(make_cuts=True):
 def df_to_X(df):
 
     drop_columns = [
-        # "Komb",
         "date",
         "Anæmi",
         "AK_beh",
@@ -192,10 +195,15 @@ def df_to_X(df):
         "risc_score1",
         "cutoff6",
         "cutoff5",
-        # "ID",
         "length_of_stay",
         "hospital",
     ]
+
+    if "Komb" in df.columns:
+        drop_columns.append("Komb")
+
+    if "ID" in df.columns:
+        drop_columns.append("ID")
 
     X = df.drop(columns=drop_columns)
     return X
@@ -207,18 +215,20 @@ def df_to_X_y(df, y_label):
     return X, y
 
 
+numerical_columns = [
+    "bmi",
+    "year",
+    "weight",
+    "age",
+    "hb",
+    "height",
+    "N_total_prescriptions",
+]
+
+
 def get_numerical_and_categorical_features(X):
 
-    numerical_features = [
-        "height",
-        "weight",
-        "hb",
-        "age",
-        "bmi",
-        "year",
-        "N_total_prescriptions",
-    ]
-    categorical_features = [col for col in X.columns if col not in numerical_features]
+    categorical_features = [col for col in X.columns if col not in numerical_columns]
 
     columns_cat_subset = X.nunique()[categorical_features]
     columns_cat_subset = columns_cat_subset[columns_cat_subset >= 3]
@@ -232,6 +242,112 @@ def get_numerical_and_categorical_features(X):
 
 def cfg_to_str(cfg):
     return f"{cfg['optimize']}__{cfg['n_trials']}__{cfg['FL_str']}"
+    # return f"{cfg['optimize']}__{cfg['n_trials']}__{cfg['FL_str']}__{cfg['PPF']}"
+
+
+#%%
+
+
+def get_train_test_splits(df_train_val, time_intervals_val):
+
+    df = df_train_val
+
+    # df["idx"] = range(len(df))
+
+    cv_splits = []
+    for i, interval in enumerate(time_intervals_val[:-1]):
+        # break
+        idx_train = df.index[df["date"] < interval]
+        mask_test = (interval <= df["date"]) & (df["date"] < time_intervals_val[i + 1])
+        idx_test = df.index[mask_test]
+        cv_splits.append((idx_train.values, idx_test.values))
+    return cv_splits
+
+
+def get_data(y_label, exclude=None, include=None, filename=filename_csv):
+
+    if exclude is not None and include is not None:
+        raise AssertionError(f"exclude and include cannot both be set.")
+
+    # load data
+    df = load_entire_dataframe(filename=filename)
+    X, y = df_to_X_y(df, y_label)
+
+    if exclude is not None:
+
+        if isinstance(exclude, str):
+            exclude = [exclude]
+
+        for column in exclude:
+            if column in X.columns:
+                X = X.drop(columns=column)
+
+    elif include is not None:
+        X = X.loc[:, include]
+
+    # find categorical features / columns / variables
+    columns_cat_all, columns_cat_subset = get_numerical_and_categorical_features(X)
+
+    # test on 2017
+    mask_test = "2017-01-01" <= df["date"]
+    df_test = df.loc[mask_test].copy()
+    X_test = X.loc[mask_test].copy()
+    y_test = y.loc[mask_test].copy()
+
+    # train and validate on < 2017
+    mask_train_val = df["date"] < "2017-01-01"
+    df_train_val = df.loc[mask_train_val].copy()
+    X_train_val = X.loc[mask_train_val].copy()
+    y_train_val = y.loc[mask_train_val].copy()
+
+    # 6 validation time intervals of 2 months in 2016
+    time_intervals_val = [f"2016-{i:02d}-01" for i in range(1, 12, 2)] + ["2017-01-01"]
+
+    cv_splits_validation = get_train_test_splits(df_train_val, time_intervals_val)
+
+    X_train_val_imputed, imputer = impute(X_train_val)
+    X_test_imputed, _ = impute(X_test, imputer=imputer)
+
+    scaler = StandardScaler()
+    X_train_val_imputed_scaled = scaler.fit_transform(X_train_val_imputed)
+    X_train_val_imputed_scaled = pd.DataFrame(
+        X_train_val_imputed_scaled,
+        columns=X_train_val_imputed.columns,
+        index=X_train_val_imputed.index,
+    )
+    X_test_imputed_scaled = scaler.transform(X_test_imputed)
+    X_test_imputed_scaled = pd.DataFrame(
+        X_test_imputed_scaled,
+        columns=X_test_imputed.columns,
+        index=X_test_imputed.index,
+    )
+
+    d_data = {}
+    d_data["X"] = X
+    d_data["X_train_val"] = X_train_val
+    d_data["X_train_val_imputed"] = X_train_val_imputed
+    d_data["X_test"] = X_test
+    d_data["X_test_imputed"] = X_test_imputed
+
+    d_data["y"] = y
+    d_data["y_train_val"] = y_train_val
+    d_data["y_test"] = y_test
+
+    d_data["df"] = df
+    d_data["df_train_val"] = df_train_val
+    d_data["df_test"] = df_test
+
+    d_data["columns_cat_all"] = columns_cat_all
+    d_data["columns_cat_subset"] = columns_cat_subset
+
+    d_data["cv_splits_validation"] = cv_splits_validation
+    d_data["imputer"] = imputer
+
+    d_data["X_train_val_imputed_scaled"] = X_train_val_imputed_scaled
+    d_data["X_test_imputed_scaled"] = X_test_imputed_scaled
+    d_data["scaler"] = scaler
+
+    return d_data
 
 
 #%%
@@ -239,18 +355,15 @@ def cfg_to_str(cfg):
 
 def get_table(X):
 
-    numerics = [
-        "age",
-        "height",
-        "weight",
-        "bmi",
-        "hb",
-    ]
+    numerical_columns_no_year = numerical_columns.copy()
+    numerical_columns_no_year.remove("year")
+    if not "N_total_prescriptions" in X.columns:
+        numerical_columns_no_year.remove("N_total_prescriptions")
 
-    categories = [col for col in X.columns if col not in numerics]
+    categories = [col for col in X.columns if col not in numerical_columns_no_year]
 
     d_table = {}
-    for numeric in numerics:
+    for numeric in numerical_columns_no_year:
         median = X[numeric].median()
         IQR = X[numeric].quantile(0.25), X[numeric].quantile(0.75)
         d_table[numeric] = f"{median:.1f} ({IQR[0]:.1f}-{IQR[1]:.1f})"
@@ -306,15 +419,15 @@ def get_lgb_datasets(d_data):
 
     d_lgb_datasets = {}
 
-    methods = ["simple", "hospital", "categorical_all", "categorical_subset"]
-    if not "hospital" in d_data["X_train_val"].columns:
-        methods.remove("hospital")
+    methods = ["simple", "categorical_all", "categorical_subset"]
 
     for X, name in zip(
-        [d_data["X_train_val"], d_data["X_train_val_imputed"]], ["", "imputed_"]
+        [d_data["X_train_val"], d_data["X_train_val_imputed"]],
+        ["", "imputed_"],
     ):
 
         for method in methods:
+
             d_lgb_datasets[f"{name}{method}"] = pandas_to_lgb_dataset(
                 X,
                 d_data["y_train_val"],
@@ -336,20 +449,12 @@ def pandas_to_lgb_dataset(
 ):
 
     if "simple" in method:
+
         dataset = lgb.Dataset(
             X.values,
             label=y.values,
             feature_name=list(X.columns),
             free_raw_data=False,
-            init_score=init_score,
-        )
-
-    elif "hospital" in method:
-        dataset = lgb.Dataset(
-            X,
-            label=y,
-            categorical_feature=["hospital"],
-            free_raw_data=False,  # needed for categorical
             init_score=init_score,
         )
 
@@ -587,7 +692,12 @@ def _compute_cutoffs(y_pred_proba):
 
 @njit
 def nb_compute_cutoff_PPF_TPR(
-    y_true, y_pred_proba, minimum=-1, maximum=-1, N=100, PPF_cut=0.2
+    y_true,
+    y_pred_proba,
+    PPF_cut,
+    minimum=-1,
+    maximum=-1,
+    N=100,
 ):
 
     if minimum == -1:
@@ -618,17 +728,43 @@ def nb_compute_cutoff_PPF_TPR(
 
 
 def compute_cutoff_PPF_TPR(
-    y_true, y_pred_proba, minimum=-1, maximum=-1, N=100, PPF_cut=0.2
+    y_true,
+    y_pred_proba,
+    PPF_cut,
+    minimum=-1,
+    maximum=-1,
+    N=100,
 ):
     if isinstance(y_true, pd.Series):
         y_true = y_true.values
     if isinstance(y_pred_proba, pd.Series):
         y_pred_proba = y_pred_proba.values
-    return nb_compute_cutoff_PPF_TPR(y_true, y_pred_proba, minimum, maximum, N, PPF_cut)
+    return nb_compute_cutoff_PPF_TPR(
+        y_true=y_true,
+        y_pred_proba=y_pred_proba,
+        PPF_cut=PPF_cut,
+        minimum=minimum,
+        maximum=maximum,
+        N=N,
+    )
 
 
-def compute_cutoff(y_true, y_pred_proba, minimum=-1, maximum=-1, N=100, PPF_cut=0.2):
-    return compute_cutoff_PPF_TPR(y_true, y_pred_proba, minimum, maximum, N, PPF_cut)[0]
+def compute_cutoff(
+    y_true,
+    y_pred_proba,
+    PPF_cut,
+    minimum=-1,
+    maximum=-1,
+    N=100,
+):
+    return compute_cutoff_PPF_TPR(
+        y_true=y_true,
+        y_pred_proba=y_pred_proba,
+        PPF_cut=PPF_cut,
+        minimum=minimum,
+        maximum=maximum,
+        N=N,
+    )[0]
 
 
 def lgb_eval_TPR_given_PPF(y_pred_proba, train_data):
@@ -706,13 +842,18 @@ def compute_PRG_AUC(y_true, y_pred_proba):
     return auprg
 
 
-def compute_performance_measures(dicts, key, cutoff=None, PPF_cut=0.2):
+def compute_performance_measures(dicts, key, PPF_cut, cutoff=None):
 
     y_true = dicts["data"][key]["y_test"]
     y_pred_proba = dicts["y_pred_proba"][key]
 
     if cutoff is None:
-        cutoff = compute_cutoff(y_true, y_pred_proba, N=100_000, PPF_cut=PPF_cut)
+        cutoff = compute_cutoff(
+            y_true=y_true,
+            y_pred_proba=y_pred_proba,
+            PPF_cut=PPF_cut,
+            N=100_000,
+        )
 
     y_pred = y_pred_proba >= cutoff
 
@@ -759,114 +900,12 @@ def compute_performance_measures(dicts, key, cutoff=None, PPF_cut=0.2):
 #%%
 
 
-def get_train_test_splits(df_train_val, time_intervals_val):
-
-    df = df_train_val
-
-    df["idx"] = range(len(df))
-
-    cv_splits = []
-    for i, interval in enumerate(time_intervals_val[:-1]):
-        # break
-        idx_train = df["idx"][df["date"] < interval]
-        mask_test = (interval <= df["date"]) & (df["date"] < time_intervals_val[i + 1])
-        idx_test = df["idx"][mask_test]
-        cv_splits.append((idx_train.values, idx_test.values))
-    return cv_splits
-
-
-def get_data(y_label, exclude=None, include=None):
-
-    if exclude is not None and include is not None:
-        raise AssertionError(f"exclude and include cannot both be set.")
-
-    # load data
-    df = load_entire_dataframe()
-    X, y = df_to_X_y(df, y_label)
-
-    if exclude is not None:
-
-        if isinstance(exclude, str):
-            exclude = [exclude]
-
-        for column in exclude:
-            if column in X.columns:
-                X = X.drop(columns=column)
-
-    elif include is not None:
-        X = X.loc[:, include]
-
-    # find categorical features / columns / variables
-    columns_cat_all, columns_cat_subset = get_numerical_and_categorical_features(X)
-
-    # test on 2017
-    mask_test = "2017-01-01" <= df["date"]
-    df_test = df.loc[mask_test].copy()
-    X_test = X.loc[mask_test].copy()
-    y_test = y.loc[mask_test].copy()
-
-    # train and validate on < 2017
-    mask_train_val = df["date"] < "2017-01-01"
-    df_train_val = df.loc[mask_train_val].copy()
-    X_train_val = X.loc[mask_train_val].copy()
-    y_train_val = y.loc[mask_train_val].copy()
-
-    # 6 validation time intervals of 2 months in 2016
-    time_intervals_val = [f"2016-{i:02d}-01" for i in range(1, 12, 2)] + ["2017-01-01"]
-
-    cv_splits_validation = get_train_test_splits(df_train_val, time_intervals_val)
-
-    X_train_val_imputed, imputer = impute(X_train_val)
-    X_test_imputed, _ = impute(X_test, imputer=imputer)
-
-    scaler = StandardScaler()
-    X_train_val_imputed_scaled = scaler.fit_transform(X_train_val_imputed)
-    X_train_val_imputed_scaled = pd.DataFrame(
-        X_train_val_imputed_scaled,
-        columns=X_train_val_imputed.columns,
-        index=X_train_val_imputed.index,
-    )
-    X_test_imputed_scaled = scaler.transform(X_test_imputed)
-    X_test_imputed_scaled = pd.DataFrame(
-        X_test_imputed_scaled,
-        columns=X_test_imputed.columns,
-        index=X_test_imputed.index,
-    )
-
-    d_data = {}
-    d_data["X"] = X
-    d_data["X_train_val"] = X_train_val
-    d_data["X_train_val_imputed"] = X_train_val_imputed
-    d_data["X_test"] = X_test
-    d_data["X_test_imputed"] = X_test_imputed
-
-    d_data["y"] = y
-    d_data["y_train_val"] = y_train_val
-    d_data["y_test"] = y_test
-
-    d_data["df"] = df
-    d_data["df_train_val"] = df_train_val
-    d_data["df_test"] = df_test
-
-    d_data["columns_cat_all"] = columns_cat_all
-    d_data["columns_cat_subset"] = columns_cat_subset
-
-    d_data["cv_splits_validation"] = cv_splits_validation
-    d_data["imputer"] = imputer
-
-    d_data["X_train_val_imputed_scaled"] = X_train_val_imputed_scaled
-    d_data["X_test_imputed_scaled"] = X_test_imputed_scaled
-    d_data["scaler"] = scaler
-
-    return d_data
-
-
 # #%%
 
 from sklearn.preprocessing import MinMaxScaler
 
 
-def add_model_age_only(dicts, y_label, key, PPF_cut=0.2):
+def add_model_age_only(dicts, y_label, key, PPF_cut):
 
     d_data = get_data(y_label)
     X_test = d_data["X_test"]
@@ -883,7 +922,7 @@ def add_model_age_only(dicts, y_label, key, PPF_cut=0.2):
 #%%
 
 
-def add_model_risc_score1(dicts, y_label, key, PPF_cut=0.2):
+def add_model_risc_score1(dicts, y_label, key, PPF_cut):
     d_data = get_data(y_label)
     dicts["data"][key] = d_data
 
@@ -899,7 +938,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn import preprocessing
 
 
-def add_model_LR(dicts, y_label, key, exclude=None, include=None, PPF_cut=0.2):
+def add_model_LR(dicts, y_label, key, PPF_cut, exclude=None, include=None):
 
     d_data = get_data(y_label, exclude=exclude, include=include)
     dicts["data"][key] = d_data
@@ -940,6 +979,7 @@ def params_from_optuna(d_optuna_all):
 
     d_params_base = {
         "objective": "binary",
+        "boosting": "gbdt",
         "verbose": -1,
         "is_unbalance": False,
         "bagging_freq": 1,
@@ -948,12 +988,11 @@ def params_from_optuna(d_optuna_all):
     d_params["optuna_all"] = {
         **d_params_base,
         **{
-            "boosting": d_optuna_all["boosting_type"],
+            # "boosting": d_optuna_all["boosting_type"],
             "max_depth": d_optuna_all["max_depth"],
             "num_leaves": d_optuna_all["num_leaves"],
             "scale_pos_weight": d_optuna_all["scale_pos_weight"],
             "min_child_weight": d_optuna_all["min_child_weight"],
-            "subsample": d_optuna_all["subsample"],
             "colsample_bytree": d_optuna_all["colsample_bytree"],
             "bagging_fraction": d_optuna_all["bagging_fraction"],
         },
@@ -1076,10 +1115,10 @@ def add_ML_model(
     y_label,
     key,
     name,
+    PPF_cut,
     use_FL=False,
     exclude=None,
     include=None,
-    PPF_cut=0.2,
 ):
 
     print(f"\n\nFitting ML model {key}. \n\n")
@@ -1101,9 +1140,11 @@ def add_ML_model(
                 alpha=trial.suggest_uniform("fl_alpha", 0, 1),
             )
 
-        # boosting_types = ["gbdt", "rf", "dart"]
-        boosting_types = ["gbdt", "dart"]
-        boosting_type = trial.suggest_categorical("boosting_type", boosting_types)
+        # # boosting_types = ["gbdt", "rf", "dart"]
+        # boosting_types = ["gbdt", "dart"]
+        # boosting_types = ["gbdt", "dart"]
+        # boosting_type = trial.suggest_categorical("boosting_type", boosting_types)
+        boosting_type = "gbdt"
 
         params = {
             "boosting": boosting_type,
@@ -1116,7 +1157,6 @@ def add_ML_model(
             "min_child_weight": trial.suggest_loguniform("min_child_weight", 1e-5, 10),
             "scale_pos_weight": trial.suggest_uniform("scale_pos_weight", 10.0, 30.0),
             "is_unbalance": False,  # due to scale_pos_weight being set
-            "subsample": trial.suggest_uniform("subsample", 0.4, 1.0),
             "colsample_bytree": trial.suggest_uniform("colsample_bytree", 0.4, 1.0),
             "bagging_freq": 1,
             "bagging_fraction": trial.suggest_uniform("bagging_fraction", 0.4, 1.0),
@@ -1156,9 +1196,9 @@ def add_ML_model(
         N_iterations_max = 10_000
         early_stopping_rounds = 50
         fobj = fl.lgb_obj if use_FL else None
-        if boosting_type == "dart":
-            N_iterations_max = 100
-            early_stopping_rounds = None
+        # if boosting_type == "dart":
+        #     N_iterations_max = 100
+        #     early_stopping_rounds = None
         # if boosting_type == "rf":
         #     fobj = None
 
@@ -1355,7 +1395,7 @@ import seaborn as sns
 import matplotlib.patches as mpatches
 
 
-def compute_suitable_area(d_ROC, PPF_cut_min=0.15, PPF_cut_max=0.25):
+def compute_suitable_area(d_ROC, PPF_cut_min, PPF_cut_max):
 
     key = "ML"
 
@@ -1645,16 +1685,20 @@ def make_ROC_curves(
     data_ROC,
     cfg_str,
     include_ML__exclude_age=False,
+    cuts=None,
 ):
 
     # PPF_cut_min, PPF_cut_max = 0.125, 0.275
+
+    if cuts is None:
+        cuts = [(0.10, 0.30), (0.125, 0.275), (0.15, 0.25)]
 
     for y_label in data_risc_scores.keys():
 
         d_risc_scores = data_risc_scores[y_label]
         d_ROC = data_ROC[y_label]
 
-        for PPF_cut_min, PPF_cut_max in [(0.10, 0.30), (0.125, 0.275), (0.15, 0.25)]:
+        for PPF_cut_min, PPF_cut_max in cuts:
 
             # break
 
