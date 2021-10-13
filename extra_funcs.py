@@ -852,7 +852,7 @@ def compute_performance_measures(dicts, key, PPF_cut, cutoff=None):
             y_true=y_true,
             y_pred_proba=y_pred_proba,
             PPF_cut=PPF_cut,
-            N=100_000,
+            N=100,
         )
 
     y_pred = y_pred_proba >= cutoff
@@ -1397,8 +1397,7 @@ import matplotlib.patches as mpatches
 
 def compute_suitable_area(d_ROC, PPF_cut_min, PPF_cut_max):
 
-    key = "ML"
-
+    key = "only_age"
     y_true = d_ROC[key]["y_test"]
     y_pred_proba = d_ROC[key]["y_pred_proba"]
 
@@ -1410,6 +1409,10 @@ def compute_suitable_area(d_ROC, PPF_cut_min, PPF_cut_max):
     )
     y_pred = y_pred_proba >= cutoff
     d_out_min = dict(_compute_performance_measures(y_true.values, y_pred))
+
+    key = "ML"
+    y_true = d_ROC[key]["y_test"]
+    y_pred_proba = d_ROC[key]["y_pred_proba"]
 
     cutoff = compute_cutoff(
         y_true,
@@ -1521,6 +1524,7 @@ def plot_ROC(
     ylims = (d_min["TPR_mean"], d_max["TPR_mean"])
 
     ax_inset.set(xlim=xlims, ylim=ylims)
+    ax_inset.locator_params(axis="both", nbins=3)
 
     rectpatch, connects = ax.indicate_inset_zoom(
         ax_inset,
@@ -1594,6 +1598,7 @@ def plot_risc_score(ax, d_risc_scores, risc_key):
 
     ax.legend()
     ax.set(xlabel="Risc Score", ylabel="Counts (normalised)", xlim=xlim)
+    ax.locator_params(axis="x", nbins=4)
 
     for item in (
         [ax.title, ax.xaxis.label, ax.yaxis.label]
@@ -1694,6 +1699,7 @@ def make_ROC_curves(
         cuts = [(0.10, 0.30), (0.125, 0.275), (0.15, 0.25)]
 
     for y_label in data_risc_scores.keys():
+        # break
 
         d_risc_scores = data_risc_scores[y_label]
         d_ROC = data_ROC[y_label]
@@ -2292,3 +2298,67 @@ def get_shap_patient(model, X_patient, use_FL):
     shap_patient = shap_values[0]
 
     return shap_patient
+
+
+#%%
+
+
+def compute_TPRs_given_PPF_cuts(y_test, y_pred_proba, PPF_cuts):
+
+    TPRs = np.zeros(len(PPF_cuts))
+
+    for i, PPF_cut in enumerate(PPF_cuts):
+        cutoff, PPF_obs, TPR = compute_cutoff_PPF_TPR(
+            y_test,
+            y_pred_proba,
+            PPF_cut,
+        )
+        TPRs[i] = TPR
+
+    return TPRs
+
+
+def compute_TPRs_all(data_risc_scores):
+
+    delta = 0.001
+    PPF_cuts = np.arange(0, 1 + delta, delta)
+
+    d_TPRs = {}
+
+    for y_label in data_risc_scores.keys():
+
+        d_risc_scores = data_risc_scores[y_label]
+
+        d_TPRs[y_label] = {}
+
+        for model in ["ML", "LR", "ML__top_10"]:
+
+            y_test = d_risc_scores[model]["y_test"]
+            y_pred_proba = d_risc_scores[model]["y_pred_proba"]
+
+            TPRs = compute_TPRs_given_PPF_cuts(
+                y_test=y_test,
+                y_pred_proba=y_pred_proba,
+                PPF_cuts=PPF_cuts,
+            )
+
+            d_TPRs[y_label][model] = TPRs
+
+    return d_TPRs, PPF_cuts
+
+
+def plot_PPF_TPR(data_risc_scores):
+
+    d_TPRs, PPF_cuts = compute_TPRs_all(data_risc_scores)
+
+    for y_label, d_TPRs_y_label in d_TPRs.items():
+
+        fig, ax = plt.subplots(figsize=(5, 5))
+        for model, TPRs in d_TPRs_y_label.items():
+            ax.plot(PPF_cuts, TPRs, "-", lw=2, label=model)
+
+        ax.set(xlabel="PPF", ylabel="TPR", title=y_label, xlim=(0, 1), ylim=(0, 1))
+        ax.legend()
+
+        filename = f"./figures/PPF_TPR__{y_label}.pdf"
+        fig.savefig(filename)

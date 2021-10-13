@@ -16,7 +16,9 @@ plt.rcParams.update({"text.usetex": False})
 run_all_models = True
 save_stuff = True
 plot_stuff = True
-forced = True
+# plot_stuff = False
+# forced = True
+forced = False
 
 use_FL = True
 FL_str = "use_FL" if use_FL else "no_FL"
@@ -25,7 +27,7 @@ y_label = "outcome_A"
 y_label = "outcome_B"
 y_labels = ["outcome_A", "outcome_B"]
 
-PPF = 0.1
+PPF = 0.25
 
 #%%
 
@@ -245,10 +247,12 @@ if plot_stuff:
         data_ROC,
         cfg_str_with_PPF,
         include_ML__exclude_age=True,
-        cuts=[(0.15, 0.25)],
+        cuts=[(PPF - 0.05, PPF + 0.05)],
     )
 
     extra_funcs.make_beeswarm_shap_plots(data_shap, cfg_str_with_PPF)
+
+    extra_funcs.plot_PPF_TPR(data_risc_scores)
 
     reload(extra_funcs)
     X_patient = extra_funcs.get_patient(data_all)
@@ -345,3 +349,6 @@ print("\n\n\nfinished")
 # special.expit(0) # log-odds to prob
 
 #%%
+
+
+# %%
