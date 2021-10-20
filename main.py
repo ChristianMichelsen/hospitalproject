@@ -27,7 +27,12 @@ y_label = "outcome_A"
 y_label = "outcome_B"
 y_labels = ["outcome_A", "outcome_B"]
 
+# PPF = 0.20
 PPF = 0.25
+# PPF = 0.30
+
+
+# %%
 
 #%%
 

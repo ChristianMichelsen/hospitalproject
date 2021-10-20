@@ -41,8 +41,10 @@ def is_hep():
 # filename = "Dtasætround2_NBI_Predict_PrimæreTXA_14_17_MASTER_WORK_1_Hb.csv"
 # filename = "Dtasætround2_NBI_Predict_PrimæreTXA_14_17_MASTER_WORK_1_Hb_LOS.csv"
 # filename_csv = "Dtasætround3_NBI_Predict_PrimæreTXA_14_17_M ASTER_WORK_1_Hb.csv"
-filename_csv = "NBI_Predict_TXA_recepter.csv"
-
+# filename_csv = "NBI_Predict_TXA_recepter.csv"
+filename_csv = (
+    "Dtasætround2_NBI_Predict_PrimæreTXA_14_17_MASTER_WORK_1_Hb_Recepter_knee.csv"
+)
 
 d_columns_rename = {
     "D_ODTO": "date",
@@ -57,7 +59,7 @@ d_columns_rename = {
     "Udhvilet": "rested",
     "Snorken": "snore",
     "DM_type": "dm_type",  # diabetes type
-    "Hypertension_ja_ell_recept": "hypertension_yes_or_prescription",
+    # "Hypertension_ja_ell_recept": "hypertension_yes_or_prescription",
     "Hyperkolesterol": "hyper_colesterol",
     "Cardiac_disease": "cardiac_disease",
     "Pulmonary_disease": "pulmonary_disease",
@@ -66,11 +68,11 @@ d_columns_rename = {
     "Fam_VTE": "family_vte",
     "Cancer": "cancer",
     "Nyre": "kidney",  # nyresvigt
-    "PsD": "psd",  # psykopharmaka
+    # "PsD": "psd",  # psykopharmaka
     "Led": "joint",
     "Alder": "age",
     "BMI": "bmi",
-    "PotentAK": "potent_ak",  # blodfortyndende behandling, renset op, stærkeste medicin
+    # "PotentAK": "potent_ak",  # blodfortyndende behandling, renset op, stærkeste medicin
     "Årstal": "year",
     "Hospital": "hospital",
     "Medical_outcome": "medical_outcome_old",  # more or less than 4 days in hospital (or re-indlæggelse)
@@ -86,6 +88,8 @@ d_columns_rename = {
     "Steroid": "steroid",
     "Total_antal_Recepter": "N_total_prescriptions",
     "kolesterolmedicin": "cholesterol_medicine",
+    "PsD_knee": "psd_knee",
+    "hypertens": "hypertens",
 }
 
 
@@ -101,7 +105,7 @@ d_translate = {
     "rested": r"$\mathrm{Rested}$",
     "snore": r"$\mathrm{Snore}$",
     "dm_type": r"$\mathrm{DM}$",
-    "hypertension_yes_or_prescription": r"$\mathrm{Hypertension}$",
+    # "hypertension_yes_or_prescription": r"$\mathrm{Hypertension}$",
     "hyper_colesterol": r"$\mathrm{Colesterol}$",
     "cardiac_disease": r"$\mathrm{Cardiac}$",
     "pulmonary_disease": r"$\mathrm{Pulmonary}$",
@@ -110,11 +114,12 @@ d_translate = {
     "family_vte": r"$\mathrm{Fam. \,\, VTE}$",
     "cancer": r"$\mathrm{Cancer}$",
     "kidney": r"$\mathrm{Kidney}$",
-    "psd": r"$\mathrm{PSD}$",
+    # "psd": r"$\mathrm{PSD}$",
+    "psd_knee": r"$\mathrm{PSD \,\, knee}$",
     "joint": r"$\mathrm{Joint}$",
     "age": r"$\mathrm{Age}$",
     "bmi": r"$\mathrm{BMI}$",
-    "potent_ak": r"$\mathrm{AK \,\, (potent)}$",
+    # "potent_ak": r"$\mathrm{AK \,\, (potent)}$",
     "year": r"$\mathrm{Year}$",
     # "month": r"$\mathrm{Month}$",
     # "day_of_week": r"$\mathrm{Week \,\, day}$",
@@ -127,6 +132,7 @@ d_translate = {
     "steroid": r"$\mathrm{Steroid}$",
     "N_total_prescriptions": r"$N_\mathrm{prescriptions}$",
     "cholesterol_medicine": r"$\mathrm{cholesterol \,\, (medicine)}$",
+    "hypertens": r"$\mathrm{hypertens}$",
 }
 
 
@@ -188,7 +194,7 @@ def df_to_X(df):
         "date",
         "Anæmi",
         "AK_beh",
-        "recept_PsD",
+        # "recept_PsD",
         "outcome_A",
         "outcome_B",
         "medical_outcome_old",
@@ -2071,7 +2077,7 @@ def get_patient(data_all):
         "rested": 0,
         "snore": 0,
         "dm_type": 0,  # insulin-treated diabetes
-        "hypertension_yes_or_prescription": 1,  # plus hypertension,
+        # "hypertension_yes_or_prescription": 1,  # plus hypertension,
         "hyper_colesterol": 0,
         "cardiac_disease": 0,  # no cardiac disease,
         "pulmonary_disease": 0,
@@ -2080,10 +2086,10 @@ def get_patient(data_all):
         "family_vte": 0,
         "cancer": 0,
         "kidney": 0,
-        "psd": 1,  # plus PSD,
+        # "psd": 1,  # plus PSD,
         "joint": 1,  # hip replacement,
         "age": 70,  # Age (70 years),
-        "potent_ak": 0,
+        # "potent_ak": 0,
         "year": 2017.5,
         "group_card": 0,
         "group_resp": 0,
@@ -2093,6 +2099,8 @@ def get_patient(data_all):
         "cholesterol_medicine": 0,
         "antirheumatika": 0,
         "N_total_prescriptions": 0,
+        "psd_knee": 0,
+        "hypertens": 0,
     }
 
     d_patient["bmi"] = d_patient["weight"] / (d_patient["height"] / 100) ** 2
