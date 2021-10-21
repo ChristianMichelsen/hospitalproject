@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from importlib import reload
 import extra_funcs
 import shap
-from matplotlib.backends.backend_pdf import PdfPages
 from collections import defaultdict
 from pathlib import Path
 import joblib
@@ -20,16 +19,17 @@ plot_stuff = True
 # forced = True
 forced = False
 
-use_FL = True
+use_FL = False
+# use_FL = True
 FL_str = "use_FL" if use_FL else "no_FL"
 
 y_label = "outcome_A"
 y_label = "outcome_B"
 y_labels = ["outcome_A", "outcome_B"]
 
-# PPF = 0.20
+PPF = 0.20
 PPF = 0.25
-# PPF = 0.30
+PPF = 0.30
 
 
 # %%
@@ -55,7 +55,7 @@ cfg["FL_str"] = FL_str
 cfg["PPF"] = PPF
 
 cfg_str = extra_funcs.cfg_to_str(cfg)
-cfg_str_with_PPF = f"{cfg_str}__{PPF}"
+cfg_str_with_PPF = f"{cfg_str}__{PPF:.2f}"
 
 
 file_ROC = Path(f"./data/data_ROC__{cfg_str_with_PPF}.joblib")
@@ -255,7 +255,7 @@ if plot_stuff:
         cuts=[(PPF - 0.05, PPF + 0.05)],
     )
 
-    extra_funcs.make_beeswarm_shap_plots(data_shap, cfg_str_with_PPF)
+    extra_funcs.make_beeswarm_shap_plots(data_shap, cfg_str)
 
     extra_funcs.plot_PPF_TPR(data_risc_scores)
 
@@ -269,7 +269,7 @@ if plot_stuff:
             data_risc_scores,
             models,
             X_patient,
-            cfg_str_with_PPF,
+            cfg_str,
             fontsize=18,
             use_FL=use_FL,
         )
@@ -279,7 +279,7 @@ if plot_stuff:
             data_risc_scores,
             models,
             X_patient,
-            cfg_str_with_PPF,
+            cfg_str,
             fontsize=18,
             use_FL=use_FL,
             suffix="__with_walking_tool",
@@ -293,7 +293,7 @@ if plot_stuff:
             data_risc_scores,
             models,
             X_patient_no_walking,
-            cfg_str_with_PPF,
+            cfg_str,
             fontsize=18,
             use_FL=use_FL,
             suffix="__no_walking_tool",
@@ -307,7 +307,7 @@ if plot_stuff:
             data_risc_scores,
             models,
             X_patient_male,
-            cfg_str_with_PPF,
+            cfg_str,
             fontsize=18,
             use_FL=use_FL,
             suffix="__male",
