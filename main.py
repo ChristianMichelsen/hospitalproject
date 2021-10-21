@@ -16,20 +16,20 @@ run_all_models = True
 save_stuff = True
 plot_stuff = True
 # plot_stuff = False
-# forced = True
-forced = False
+forced = True
+# forced = False
 
-use_FL = False
-# use_FL = True
+# use_FL = False
+use_FL = True
 FL_str = "use_FL" if use_FL else "no_FL"
 
 y_label = "outcome_A"
 y_label = "outcome_B"
 y_labels = ["outcome_A", "outcome_B"]
 
-PPF = 0.20
+# PPF = 0.20
 PPF = 0.25
-PPF = 0.30
+# PPF = 0.30
 
 
 # %%

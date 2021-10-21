@@ -11,7 +11,7 @@ import joblib
 
 y_label = "outcome_A"
 
-df1 = extra_funcs.load_entire_dataframe("NBI_Predict_TXA_recepter.csv")
+df1 = extra_funcs.load_entire_dataframe("other/NBI_Predict_TXA_recepter.csv")
 X1 = extra_funcs.df_to_X(df1)
 y1 = df1.loc[:, y_label]
 
@@ -21,3 +21,9 @@ df2 = extra_funcs.load_entire_dataframe(
 )
 X2 = extra_funcs.df_to_X(df2)
 y2 = df2.loc[:, y_label]
+
+cols1 = set(df1.columns)
+cols2 = set(df2.columns)
+
+cols1.difference(cols2)
+cols2.difference(cols1)

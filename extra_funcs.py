@@ -181,7 +181,7 @@ def load_entire_dataframe(filename=filename_csv):
         .pipe(add_cuts)
         .pipe(remove_date_nans)
         .pipe(add_date_info_to_df)
-        .pipe(remove_to_much_nans)
+        # .pipe(remove_to_much_nans)
         .reset_index(drop=True)
     )
 
