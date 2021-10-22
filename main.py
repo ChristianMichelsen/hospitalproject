@@ -13,22 +13,25 @@ plt.rcParams.update({"text.usetex": False})
 
 # run_all_models = False
 run_all_models = True
-save_stuff = True
-plot_stuff = True
 # plot_stuff = False
-forced = True
+plot_stuff = True
+# save_stuff = False
+save_stuff = True
 # forced = False
+forced = True
 
-# use_FL = False
-use_FL = True
+use_FL = False
+# use_FL = True
 FL_str = "use_FL" if use_FL else "no_FL"
 
-y_label = "outcome_A"
 y_label = "outcome_B"
+y_label = "outcome_A"
 y_labels = ["outcome_A", "outcome_B"]
 
-# PPF = 0.20
-PPF = 0.25
+# PPF = 0.10
+# PPF = 0.15
+PPF = 0.20
+# PPF = 0.25
 # PPF = 0.30
 
 
@@ -180,8 +183,8 @@ else:
 
         shap_ordered_columns = extra_funcs.get_shap_ordered_columns(
             dicts=dicts,
-            key="ML",
             use_FL=use_FL,
+            key="ML",
         )
 
         extra_funcs.add_ML_model(
@@ -257,23 +260,22 @@ if plot_stuff:
 
     extra_funcs.make_beeswarm_shap_plots(data_shap, cfg_str)
 
-    extra_funcs.plot_PPF_TPR(data_risc_scores)
+    extra_funcs.plot_PPF_TPR(data_risc_scores, cfg_str)
 
-    reload(extra_funcs)
+    # reload(extra_funcs)
     X_patient = extra_funcs.get_patient(data_all)
 
+    extra_funcs.make_shap_plots(
+        data_shap,
+        data_risc_scores,
+        models,
+        X_patient,
+        cfg_str,
+        fontsize=18,
+        use_FL=use_FL,
+    )
+
     if False:
-
-        extra_funcs.make_shap_plots(
-            data_shap,
-            data_risc_scores,
-            models,
-            X_patient,
-            cfg_str,
-            fontsize=18,
-            use_FL=use_FL,
-        )
-
         extra_funcs.make_shap_plots(
             data_shap,
             data_risc_scores,
@@ -357,3 +359,41 @@ print("\n\n\nfinished")
 
 
 # %%
+
+
+if False:
+
+    d_translate = extra_funcs.d_translate
+
+    y_label = "outcome_A"
+    method = "ML"
+
+    for y_label in y_labels:
+
+        for method in ['ML', 'LR']:
+
+            shap_values = data_shap[y_label][method]
+
+            fig, ax = plt.subplots(figsize=(10, 10))
+            shap.plots.scatter(
+                shap_values=shap_values[:, d_translate["group_ak"]],
+                color=shap_values[:, d_translate["family_vte"]],
+                ax=ax,
+                x_jitter=0.8,
+                alpha=0.8,
+            )
+            filename = f"./figures/shap_interation__{y_label}__{method}__AK-VTE.pdf"
+            fig.savefig(filename, dpi=300)
+
+            fig, ax = plt.subplots(figsize=(10, 10))
+            shap.plots.scatter(
+                shap_values=shap_values[:, d_translate["group_card"]],
+                color=shap_values[:, d_translate["hypertens"]],
+                ax=ax,
+                x_jitter=0.8,
+                alpha=0.5,
+            )
+            filename = f"./figures/shap_interation__{y_label}__{method}__card-hyper.pdf"
+            fig.savefig(filename, dpi=300)
+
+

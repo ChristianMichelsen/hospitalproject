@@ -703,7 +703,7 @@ def nb_compute_cutoff_PPF_TPR(
     PPF_cut,
     minimum=-1,
     maximum=-1,
-    N=100,
+    N=1_000_000,
 ):
 
     if minimum == -1:
@@ -739,7 +739,7 @@ def compute_cutoff_PPF_TPR(
     PPF_cut,
     minimum=-1,
     maximum=-1,
-    N=100,
+    N=1_000_000,
 ):
     if isinstance(y_true, pd.Series):
         y_true = y_true.values
@@ -761,7 +761,7 @@ def compute_cutoff(
     PPF_cut,
     minimum=-1,
     maximum=-1,
-    N=100,
+    N=1_000_000,
 ):
     return compute_cutoff_PPF_TPR(
         y_true=y_true,
@@ -858,7 +858,7 @@ def compute_performance_measures(dicts, key, PPF_cut, cutoff=None):
             y_true=y_true,
             y_pred_proba=y_pred_proba,
             PPF_cut=PPF_cut,
-            N=100,
+            N=1_000_000,
         )
 
     y_pred = y_pred_proba >= cutoff
@@ -1737,7 +1737,7 @@ def make_ROC_curves(
 #%%
 
 
-def get_shap_ordered_columns(dicts, key="ML", use_FL=False):
+def get_shap_ordered_columns(dicts, use_FL, key="ML"):
 
     key = "ML"
     model = dicts["models"][key]
@@ -1745,6 +1745,7 @@ def get_shap_ordered_columns(dicts, key="ML", use_FL=False):
     # explainer = shap.TreeExplainer(model.model if use_FL else model) # Explainer
     explainer = shap.Explainer(model.model if use_FL else model)
     shap_values = explainer(X_test)
+
     if len(shap_values.values.shape) == 3:
         df_shap_values = pd.DataFrame(
             shap_values.values[:, :, 1], columns=X_test.columns
@@ -1786,6 +1787,10 @@ def get_ML_LR_shap_values(dicts, key, use_FL, use_test=False):
         explainer = shap.LinearExplainer(model, X)
 
     shap_values = explainer(X)
+
+    if len(shap_values.values.shape) == 3:
+        shap_values = shap_values[:, :, 1]
+
     return shap_values
 
 
@@ -1794,10 +1799,7 @@ def get_df_shap_top10(dicts, keys=("ML", "LR"), use_FL=False, use_test=False):
     shap_values_ML = get_ML_LR_shap_values(dicts, keys[0], use_FL, use_test=use_test)
     shap_values_LR = get_ML_LR_shap_values(dicts, keys[1], use_FL, use_test=use_test)
 
-    if len(shap_values_ML.values.shape) == 3:
-        data_ML = np.abs(shap_values_ML.values[:, :, 1]).mean(axis=0)
-    else:
-        data_ML = shap_values_ML.abs.mean(axis=0).values
+    data_ML = shap_values_ML.abs.mean(axis=0).values
 
     df_shap_values = pd.DataFrame(
         index=shap_values_ML.feature_names,
@@ -2272,8 +2274,8 @@ def make_beeswarm_shap_plots(data_shap, cfg_str):
 
             figname = f"./figures/feature_importance_beeswarm__{y_label}__{method}__{cfg_str}.pdf"
 
-            if len(d_shap[method].values.shape) == 3:
-                d_shap[method].values = d_shap[method].values[:, :, 1]
+            # if len(d_shap[method].values.shape) == 3:
+                # d_shap[method].values = d_shap[method].values[:, :, 1]
 
             shap.plots.beeswarm(d_shap[method], max_display=20, show=False)
             plt.savefig(figname, bbox_inches="tight")
@@ -2355,7 +2357,7 @@ def compute_TPRs_all(data_risc_scores):
     return d_TPRs, PPF_cuts
 
 
-def plot_PPF_TPR(data_risc_scores):
+def plot_PPF_TPR(data_risc_scores, cfg_str):
 
     d_TPRs, PPF_cuts = compute_TPRs_all(data_risc_scores)
 
@@ -2368,5 +2370,5 @@ def plot_PPF_TPR(data_risc_scores):
         ax.set(xlabel="PPF", ylabel="TPR", title=y_label, xlim=(0, 1), ylim=(0, 1))
         ax.legend()
 
-        filename = f"./figures/PPF_TPR__{y_label}.pdf"
+        filename = f"./figures/PPF_TPR__{cfg_str}__{y_label}.pdf"
         fig.savefig(filename)
