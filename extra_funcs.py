@@ -2275,7 +2275,7 @@ def make_beeswarm_shap_plots(data_shap, cfg_str):
             figname = f"./figures/feature_importance_beeswarm__{y_label}__{method}__{cfg_str}.pdf"
 
             # if len(d_shap[method].values.shape) == 3:
-                # d_shap[method].values = d_shap[method].values[:, :, 1]
+            # d_shap[method].values = d_shap[method].values[:, :, 1]
 
             shap.plots.beeswarm(d_shap[method], max_display=20, show=False)
             plt.savefig(figname, bbox_inches="tight")

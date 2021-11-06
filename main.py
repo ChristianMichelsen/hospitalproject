@@ -13,12 +13,12 @@ plt.rcParams.update({"text.usetex": False})
 
 # run_all_models = False
 run_all_models = True
-# plot_stuff = False
-plot_stuff = True
-# save_stuff = False
-save_stuff = True
-# forced = False
-forced = True
+plot_stuff = False
+# plot_stuff = True
+save_stuff = False
+# save_stuff = True
+forced = False
+# forced = True
 
 use_FL = False
 # use_FL = True
@@ -370,30 +370,121 @@ if False:
 
     for y_label in y_labels:
 
-        for method in ['ML', 'LR']:
+        shap_values = data_shap[y_label][method]
 
-            shap_values = data_shap[y_label][method]
+        fig, ax = plt.subplots(figsize=(10, 10))
+        shap.plots.scatter(
+            shap_values=shap_values[:, d_translate["group_ak"]],
+            color=shap_values[:, d_translate["family_vte"]],
+            ax=ax,
+            x_jitter=0.8,
+            alpha=0.8,
+        )
+        filename = f"./figures/shap_interation__{y_label}__{method}__AK-VTE.pdf"
+        fig.savefig(filename, dpi=300)
 
-            fig, ax = plt.subplots(figsize=(10, 10))
-            shap.plots.scatter(
-                shap_values=shap_values[:, d_translate["group_ak"]],
-                color=shap_values[:, d_translate["family_vte"]],
-                ax=ax,
-                x_jitter=0.8,
-                alpha=0.8,
-            )
-            filename = f"./figures/shap_interation__{y_label}__{method}__AK-VTE.pdf"
-            fig.savefig(filename, dpi=300)
+        fig, ax = plt.subplots(figsize=(10, 10))
+        shap.plots.scatter(
+            shap_values=shap_values[:, d_translate["group_card"]],
+            color=shap_values[:, d_translate["hypertens"]],
+            ax=ax,
+            x_jitter=0.8,
+            alpha=0.5,
+        )
+        filename = f"./figures/shap_interation__{y_label}__{method}__card-hyper.pdf"
+        fig.savefig(filename, dpi=300)
 
-            fig, ax = plt.subplots(figsize=(10, 10))
-            shap.plots.scatter(
-                shap_values=shap_values[:, d_translate["group_card"]],
-                color=shap_values[:, d_translate["hypertens"]],
-                ax=ax,
-                x_jitter=0.8,
-                alpha=0.5,
-            )
-            filename = f"./figures/shap_interation__{y_label}__{method}__card-hyper.pdf"
-            fig.savefig(filename, dpi=300)
+        fig, ax = plt.subplots(figsize=(10, 10))
+        shap.plots.scatter(
+            shap_values=shap_values[:, d_translate["group_psych"]],
+            color=shap_values[:, d_translate["psd_knee"]],
+            ax=ax,
+            x_jitter=0.8,
+            alpha=0.5,
+        )
+        filename = f"./figures/shap_interation__{y_label}__{method}__psych-psd.pdf"
+        fig.savefig(filename, dpi=300)
+
+        fig, ax = plt.subplots(figsize=(10, 10))
+        shap.plots.scatter(
+            shap_values=shap_values[:, d_translate["group_psych"]],
+            color=shap_values[:, d_translate["age"]],
+            ax=ax,
+            x_jitter=0.8,
+            alpha=0.5,
+        )
+        filename = f"./figures/shap_interation__{y_label}__{method}__psych-age.pdf"
+        fig.savefig(filename, dpi=300)
+
+        fig, ax = plt.subplots(figsize=(10, 10))
+        shap.plots.scatter(
+            shap_values=shap_values[:, d_translate["group_resp"]],
+            color=shap_values,
+            ax=ax,
+            x_jitter=0.8,
+            alpha=0.5,
+        )
+        filename = f"./figures/shap_interation__{y_label}__{method}__resp-color.pdf"
+        fig.savefig(filename, dpi=300)
+
+        fig, ax = plt.subplots(figsize=(10, 10))
+        shap.plots.scatter(
+            shap_values=shap_values[:, d_translate["group_resp"]],
+            ax=ax,
+            x_jitter=0.8,
+            alpha=0.5,
+        )
+        filename = f"./figures/shap_interation__{y_label}__{method}__resp.pdf"
+        fig.savefig(filename, dpi=300)
+
+        fig, ax = plt.subplots(figsize=(10, 10))
+        shap.plots.scatter(
+            shap_values=shap_values[:, d_translate["N_total_prescriptions"]],
+            color=shap_values,
+            ax=ax,
+            x_jitter=0.8,
+            alpha=0.5,
+        )
+        filename = (
+            f"./figures/shap_interation__{y_label}__{method}__N_prescriptions.pdf"
+        )
+        fig.savefig(filename, dpi=300)
 
 
+# %%
+
+
+d_risc_scores = data_risc_scores["outcome_A"]["ML"]
+cutoff = d_risc_scores["cutoff"]
+y_pred_proba = d_risc_scores["y_pred_proba"]
+
+worst = np.argmax(y_pred_proba)
+best = np.argmin(y_pred_proba)
+
+d_risc_scores["y_test"].iloc[worst]
+d_risc_scores["y_test"].iloc[best]
+
+
+X_worst = data_all["X_test"].iloc[worst]
+X_best = data_all["X_test"].iloc[best]
+
+
+y_pred_worst = models["outcome_A"].predict(X_worst)[0]
+y_pred_best = models["outcome_A"].predict(X_best)[0]
+
+X_worst_low_age = X_worst.copy()
+print(X_worst_low_age["age"])
+X_worst_low_age["age"] = 18
+X_best_high_age = X_best.copy()
+print(X_best_high_age["age"])
+X_best_high_age["age"] = 100
+
+
+y_pred_worst_low_age = models["outcome_A"].predict(X_worst_low_age)[0]
+y_pred_best_high_age = models["outcome_A"].predict(X_best_high_age)[0]
+
+
+print(f"Cutoff: {cutoff:.3f}")
+print(f"Worst patient: {y_pred_worst:.3f}, low age: {y_pred_worst_low_age:.3f}")
+print(f"Best patient: {y_pred_best:.3f}, high age: {y_pred_best_high_age:.3f}")
+# %%
