@@ -1951,7 +1951,7 @@ def shap_plot_global(
     ax.set_xlabel(r"$\mathrm{Feature \,\, importance}$")
     ax.set_yticks(ind)
     ax.set_yticklabels(d_shap[key].index)
-    ax.set_title("Global", pad=15, fontsize=30)
+    # ax.set_title("Global", pad=15, fontsize=30)
 
     autolabel(ax, rects1, color=colors[0], fontsize=16)
     autolabel(ax, rects2, color=colors[1], fontsize=16)
@@ -1980,14 +1980,17 @@ def shap_plot_global(
     )
 
 
+from copy import deepcopy
+
+
 def make_shap_plots(
     data_shap,
-    data_risc_scores,
-    models,
-    X_patient,
+    # data_risc_scores,
+    # models,
+    # X_patient,
     cfg_str,
     fontsize=16,
-    use_FL=False,
+    # use_FL=False,
     suffix="",
 ):
 
@@ -2006,18 +2009,28 @@ def make_shap_plots(
             colors,
         )
 
-        cutoff = data_risc_scores[y_label]["ML"]["cutoff"]
-        model = models[y_label]
-
-        shap_patient = get_shap_patient(model, X_patient, use_FL)
-
-        shap_collection_patient = get_shap_plot_object(
-            shap_patient,
-            cutoff,
-            max_display=10,
+        method = "ML"
+        shap_values = d_shap[method]
+        beeswarm(
+            shap_values,
+            max_display=11,
+            ax=ax_local,
+            fig=fig,
         )
+        # shap.plots.beeswarm(shap_values, max_display=10, show=False)
 
-        make_local_shap_plot(ax_local, shap_collection_patient, fontsize=fontsize)
+        # cutoff = data_risc_scores[y_label]["ML"]["cutoff"]
+        # model = models[y_label]
+
+        # shap_patient = get_shap_patient(model, X_patient, use_FL)
+
+        # shap_collection_patient = get_shap_plot_object(
+        #     shap_patient,
+        #     cutoff,
+        #     max_display=10,
+        # )
+
+        # make_local_shap_plot(ax_local, shap_collection_patient, fontsize=fontsize)
 
         fig.tight_layout()
 
@@ -2029,6 +2042,248 @@ def make_shap_plots(
         # plt.close("all")
 
     # return figs
+
+
+#%%
+
+
+from shap import Explanation
+from shap.plots._labels import labels
+from shap.plots._utils import convert_ordering, convert_color
+from shap.plots import colors
+from shap.utils import safe_isinstance
+
+
+# TODO: Add support for hclustering based explanations where we sort the leaf order by magnitude and then show the dendrogram to the left
+def beeswarm(
+    shap_values,
+    max_display=10,
+    order=Explanation.abs.mean(0),
+    color=None,
+    axis_color="#333333",
+    alpha=1,
+    color_bar=True,
+    ax=None,
+    fig=None,
+):
+    """Create a SHAP beeswarm plot, colored by feature values when they are provided.
+    Parameters
+    ----------
+    shap_values : Explanation
+        This is an Explanation object containing a matrix of SHAP values (# samples x # features).
+    max_display : int
+        How many top features to include in the plot (default is 20, or 7 for interaction plots)
+    plot_size : "auto" (default), float, (float, float), or None
+        What size to make the plot. By default the size is auto-scaled based on the number of
+        features that are being displayed. Passing a single float will cause each row to be that
+        many inches high. Passing a pair of floats will scale the plot by that
+        number of inches. If None is passed then the size of the current figure will be left
+        unchanged.
+    """
+
+    color_bar_label = "Feature value"
+
+    shap_exp = deepcopy(shap_values)
+    base_values = shap_exp.base_values
+    values = shap_exp.values
+    features = shap_exp.data
+    feature_names = shap_exp.feature_names
+
+    order = convert_ordering(order, values)
+
+    color = colors.red_blue
+    color = convert_color(color)
+
+    idx2cat = None
+    num_features = values.shape[1]
+
+    # determine how many top features we will plot
+    if max_display is None:
+        max_display = len(feature_names)
+    num_features = min(max_display, len(feature_names))
+
+    # iteratively merge nodes until we can cut off the smallest feature values to stay within
+    # num_features without breaking a cluster tree
+    orig_inds = [[i] for i in range(len(feature_names))]
+    orig_values = values.copy()
+    feature_order = convert_ordering(order, Explanation(np.abs(values)))
+
+    # here we build our feature names, accounting for the fact that some features might be merged together
+    feature_inds = feature_order[:max_display]
+    y_pos = np.arange(len(feature_inds), 0, -1)
+    feature_names_new = []
+    for pos, inds in enumerate(orig_inds):
+        if len(inds) == 1:
+            feature_names_new.append(feature_names[inds[0]])
+        elif len(inds) <= 2:
+            feature_names_new.append(" + ".join([feature_names[i] for i in inds]))
+        else:
+            max_ind = np.argmax(np.abs(orig_values).mean(0)[inds])
+            feature_names_new.append(
+                feature_names[inds[max_ind]] + " + %d other features" % (len(inds) - 1)
+            )
+    feature_names = feature_names_new
+
+    # see how many individual (vs. grouped at the end) features we are plotting
+    if num_features < len(values[0]):
+        num_cut = np.sum(
+            [
+                len(orig_inds[feature_order[i]])
+                for i in range(num_features - 1, len(values[0]))
+            ]
+        )
+        values[:, feature_order[num_features - 1]] = np.sum(
+            [
+                values[:, feature_order[i]]
+                for i in range(num_features - 1, len(values[0]))
+            ],
+            0,
+        )
+
+    # build our y-tick labels
+    yticklabels = [feature_names[i] for i in feature_inds]
+    if num_features < len(values[0]):
+        yticklabels[-1] = "Sum of %d other features" % num_cut
+
+    row_height = 0.4
+
+    ax_was_None = True
+    if ax is None or fig is None:
+        fig, ax = plt.subplots(
+            figsize=(8, min(len(feature_order), max_display) * row_height + 1.5)
+        )
+        ax_was_None = True
+
+    ax.axvline(x=0, color="#999999", zorder=-1)
+
+    # make the beeswarm dots
+    for pos, i in enumerate(reversed(feature_inds)):
+        ax.axhline(y=pos, color="#cccccc", lw=0.5, dashes=(1, 5), zorder=-1)
+        shaps = values[:, i]
+        fvalues = None if features is None else features[:, i]
+        inds = np.arange(len(shaps))
+        np.random.shuffle(inds)
+        if fvalues is not None:
+            fvalues = fvalues[inds]
+        shaps = shaps[inds]
+        colored_feature = True
+        fvalues = np.array(fvalues, dtype=np.float64)  # make sure this can be numeric
+        N = len(shaps)
+        # hspacing = (np.max(shaps) - np.min(shaps)) / 200
+        # curr_bin = []
+        nbins = 100
+        quant = np.round(
+            nbins * (shaps - np.min(shaps)) / (np.max(shaps) - np.min(shaps) + 1e-8)
+        )
+        inds = np.argsort(quant + np.random.randn(N) * 1e-6)
+        layer = 0
+        last_bin = -1
+        ys = np.zeros(N)
+        for ind in inds:
+            if quant[ind] != last_bin:
+                layer = 0
+            ys[ind] = np.ceil(layer / 2) * ((layer % 2) * 2 - 1)
+            layer += 1
+            last_bin = quant[ind]
+        ys *= 0.9 * (row_height / np.max(ys + 1))
+
+        if pos == 0:
+            mask = (np.nanpercentile(shaps, 0.1) <= shaps) & (
+                shaps <= np.nanpercentile(shaps, 99.9)
+            )
+            parts = ax.violinplot(
+                shaps[mask],
+                positions=[0],
+                widths=[0.9],
+                vert=False,
+                showextrema=False,
+                bw_method=0.1,
+            )
+            for pc in parts["bodies"]:
+                pc.set_facecolor("#777777")
+                pc.set_edgecolor("black")
+                pc.set_alpha(0.75)
+
+        else:
+
+            # trim the color range, but prevent the color range from collapsing
+            vmin = np.nanpercentile(fvalues, 5)
+            vmax = np.nanpercentile(fvalues, 95)
+            if vmin == vmax:
+                vmin = np.nanpercentile(fvalues, 1)
+                vmax = np.nanpercentile(fvalues, 99)
+                if vmin == vmax:
+                    vmin = np.min(fvalues)
+                    vmax = np.max(fvalues)
+            if vmin > vmax:  # fixes rare numerical precision issues
+                vmin = vmax
+
+            # plot the nan fvalues in the interaction feature as grey
+            nan_mask = np.isnan(fvalues)
+            ax.scatter(
+                shaps[nan_mask],
+                pos + ys[nan_mask],
+                color="#777777",
+                vmin=vmin,
+                vmax=vmax,
+                s=16,
+                alpha=alpha,
+                linewidth=0,
+                zorder=3,
+                rasterized=len(shaps) > 500,
+            )
+
+            # plot the non-nan fvalues colored by the trimmed feature value
+            cvals = fvalues[np.invert(nan_mask)].astype(np.float64)
+            cvals_imp = cvals.copy()
+            cvals_imp[np.isnan(cvals)] = (vmin + vmax) / 2.0
+            cvals[cvals_imp > vmax] = vmax
+            cvals[cvals_imp < vmin] = vmin
+            ax.scatter(
+                shaps[np.invert(nan_mask)],
+                pos + ys[np.invert(nan_mask)],
+                cmap=color,
+                vmin=vmin,
+                vmax=vmax,
+                s=16,
+                c=cvals,
+                alpha=alpha,
+                linewidth=0,
+                zorder=3,
+                rasterized=len(shaps) > 500,
+            )
+
+    # draw the color bar
+    import matplotlib.cm as cm
+
+    m = cm.ScalarMappable(cmap=color)
+    m.set_array([0, 1])
+    cb = plt.colorbar(m, ticks=[0, 1], aspect=1000)
+    cb.set_ticklabels(["Low", "High"])
+
+    cb.set_label(color_bar_label, size=18, labelpad=0)
+    cb.ax.tick_params(labelsize=16, length=0)
+    cb.set_alpha(1)
+    cb.outline.set_visible(False)
+    bbox = cb.ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    cb.ax.set_aspect((bbox.height - 0.9) * 20)
+    # cb.draw_all()
+
+    ax.xaxis.set_ticks_position("bottom")
+    ax.yaxis.set_ticks_position("none")
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    # ax.tick_params(color=axis_color, labelcolor=axis_color)
+    ax.tick_params("y", length=20, width=0.5, which="major")
+    ax.tick_params("x", labelsize=11)
+    ax.set_xlabel("SHAP value (impact on model output)", fontsize=18)
+    ax.set_yticks(range(len(feature_inds)))
+    ax.set_yticklabels(reversed(yticklabels), fontsize=18)
+    ax.set_ylim(-1, len(feature_inds))
+
+    if ax_was_None:
+        return fig, ax
 
 
 #%%

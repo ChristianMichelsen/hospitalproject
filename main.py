@@ -37,8 +37,6 @@ PPF = 0.20
 
 # %%
 
-#%%
-
 cfg = dict()
 
 # save_plots = False
@@ -263,16 +261,16 @@ if plot_stuff:
     extra_funcs.plot_PPF_TPR(data_risc_scores, cfg_str)
 
     # reload(extra_funcs)
-    X_patient = extra_funcs.get_patient(data_all)
+    # X_patient = extra_funcs.get_patient(data_all)
 
     extra_funcs.make_shap_plots(
         data_shap,
-        data_risc_scores,
-        models,
-        X_patient,
+        # data_risc_scores,
+        # models,
+        # X_patient,
         cfg_str,
         fontsize=18,
-        use_FL=use_FL,
+        # use_FL=use_FL,
     )
 
     if False:
@@ -488,3 +486,6 @@ print(f"Cutoff: {cutoff:.3f}")
 print(f"Worst patient: {y_pred_worst:.3f}, low age: {y_pred_worst_low_age:.3f}")
 print(f"Best patient: {y_pred_best:.3f}, high age: {y_pred_best_high_age:.3f}")
 # %%
+
+
+#%%
