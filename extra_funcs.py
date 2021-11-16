@@ -1632,8 +1632,8 @@ def make_risc_ROC_curve(
     ]
 
     names = [
-        r"$\mathrm{ML}$",
-        r"$\mathrm{LR}$",
+        r"$\mathrm{ML33}$",
+        r"$\mathrm{LR33}$",
         r"$\mathrm{ML10}$",
         r"$\mathrm{LR10}$",
         r"$\mathrm{ML-NoAge}$",
@@ -1826,7 +1826,7 @@ def get_df_shap_top10(dicts, keys=("ML", "LR"), use_FL=False, use_test=False):
 
     df_shap_top10 = df_shap_values.loc[top10_union].sort_values("ML", ascending=False)
 
-    df_shap_top10.loc[r"$\mathrm{''Overflow''}$"] = df_shap_values.loc[
+    df_shap_top10.loc[r"$\mathrm{Remaining \,\, variables}$"] = df_shap_values.loc[
         everything_but_top10
     ].sum(axis=0)
 
@@ -1927,8 +1927,8 @@ def shap_plot_global(
         d_shap[key] = d_shap[key].iloc[1:]
     else:
         key = "top10"
-        legend_ML = r"$\mathrm{ML}$"
-        legend_LR = r"$\mathrm{LR}$"
+        legend_ML = r"$\mathrm{ML33}$"
+        legend_LR = r"$\mathrm{LR33}$"
 
     ind = np.arange(len(d_shap[key]))
 
@@ -1972,6 +1972,14 @@ def shap_plot_global(
 
     ax.xaxis.label.set_fontsize(30)
     ax.xaxis.set_major_locator(MaxNLocator(4))
+
+    # # Only show ticks on the left and bottom spines
+    # ax.yaxis.set_ticks_position('left')
+    # ax.xaxis.set_ticks_position('bottom')
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.get_xaxis().tick_bottom()
+    ax.get_yaxis().tick_left()
 
     ax.legend(
         loc="lower right",
@@ -2035,7 +2043,7 @@ def make_shap_plots(
         fig.tight_layout()
 
         filename = f"./figures/shap__{y_label}__{cfg_str}{suffix}"
-        fig.savefig(filename + ".pdf")
+        fig.savefig(filename + ".pdf", bbox_inches="tight", pad_inches=0.15)
         fig.savefig(filename.replace("figures/", "figures/pngs/") + ".png", dpi=200)
 
         # figs.append(fig)
@@ -2143,7 +2151,8 @@ def beeswarm(
     # build our y-tick labels
     yticklabels = [feature_names[i] for i in feature_inds]
     if num_features < len(values[0]):
-        yticklabels[-1] = "Sum of %d other features" % num_cut
+        # yticklabels[-1] = "Sum of %d other features" % num_cut
+        yticklabels[-1] = "Remaining variables"
 
     row_height = 0.4
 
@@ -2262,7 +2271,7 @@ def beeswarm(
     cb.set_ticklabels(["Low", "High"])
 
     cb.set_label(color_bar_label, size=18, labelpad=0)
-    cb.ax.tick_params(labelsize=16, length=0)
+    cb.ax.tick_params(labelsize=18, length=0)
     cb.set_alpha(1)
     cb.outline.set_visible(False)
     bbox = cb.ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
@@ -2275,11 +2284,11 @@ def beeswarm(
     ax.spines["top"].set_visible(False)
     ax.spines["left"].set_visible(False)
     # ax.tick_params(color=axis_color, labelcolor=axis_color)
-    ax.tick_params("y", length=20, width=0.5, which="major")
-    ax.tick_params("x", labelsize=11)
-    ax.set_xlabel("SHAP value (impact on model output)", fontsize=18)
+    ax.tick_params("y", labelsize=20, length=22, width=0.5, which="major")
+    ax.tick_params("x", labelsize=18)
+    ax.set_xlabel("SHAP value (impact on model output)", fontsize=22)
     ax.set_yticks(range(len(feature_inds)))
-    ax.set_yticklabels(reversed(yticklabels), fontsize=18)
+    ax.set_yticklabels(reversed(yticklabels), fontsize=22)
     ax.set_ylim(-1, len(feature_inds))
 
     if ax_was_None:

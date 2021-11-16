@@ -15,8 +15,8 @@ plt.rcParams.update({"text.usetex": False})
 run_all_models = True
 plot_stuff = False
 # plot_stuff = True
-save_stuff = False
-# save_stuff = True
+# save_stuff = False
+save_stuff = True
 forced = False
 # forced = True
 
@@ -246,7 +246,7 @@ if plot_stuff:
     print("Plotting stuff")
 
     reload(extra_funcs)
-    extra_funcs.create_length_of_stay_sig_bkg(data_df)
+    # extra_funcs.create_length_of_stay_sig_bkg(data_df)
 
     extra_funcs.make_ROC_curves(
         data_risc_scores,
@@ -256,62 +256,62 @@ if plot_stuff:
         cuts=[(PPF - 0.05, PPF + 0.05)],
     )
 
-    extra_funcs.make_beeswarm_shap_plots(data_shap, cfg_str)
+    # extra_funcs.make_beeswarm_shap_plots(data_shap, cfg_str)
 
-    extra_funcs.plot_PPF_TPR(data_risc_scores, cfg_str)
+    # extra_funcs.plot_PPF_TPR(data_risc_scores, cfg_str)
 
     # reload(extra_funcs)
     # X_patient = extra_funcs.get_patient(data_all)
 
     extra_funcs.make_shap_plots(
         data_shap,
+        cfg_str,
+        fontsize=18,
         # data_risc_scores,
         # models,
         # X_patient,
-        cfg_str,
-        fontsize=18,
         # use_FL=use_FL,
     )
 
-    if False:
-        extra_funcs.make_shap_plots(
-            data_shap,
-            data_risc_scores,
-            models,
-            X_patient,
-            cfg_str,
-            fontsize=18,
-            use_FL=use_FL,
-            suffix="__with_walking_tool",
-        )
+    # if False:
+    #     extra_funcs.make_shap_plots(
+    #         data_shap,
+    #         data_risc_scores,
+    #         models,
+    #         X_patient,
+    #         cfg_str,
+    #         fontsize=18,
+    #         use_FL=use_FL,
+    #         suffix="__with_walking_tool",
+    #     )
 
-        X_patient_no_walking = X_patient.copy()
-        X_patient_no_walking["walking_tool"] = 0
+    #     X_patient_no_walking = X_patient.copy()
+    #     X_patient_no_walking["walking_tool"] = 0
 
-        extra_funcs.make_shap_plots(
-            data_shap,
-            data_risc_scores,
-            models,
-            X_patient_no_walking,
-            cfg_str,
-            fontsize=18,
-            use_FL=use_FL,
-            suffix="__no_walking_tool",
-        )
+    #     extra_funcs.make_shap_plots(
+    #         data_shap,
+    #         data_risc_scores,
+    #         models,
+    #         X_patient_no_walking,
+    #         cfg_str,
+    #         fontsize=18,
+    #         use_FL=use_FL,
+    #         suffix="__no_walking_tool",
+    #     )
 
-        X_patient_male = X_patient.copy()
-        X_patient_male["sex"] = 1
+    #     X_patient_male = X_patient.copy()
+    #     X_patient_male["sex"] = 1
 
-        extra_funcs.make_shap_plots(
-            data_shap,
-            data_risc_scores,
-            models,
-            X_patient_male,
-            cfg_str,
-            fontsize=18,
-            use_FL=use_FL,
-            suffix="__male",
-        )
+    #     extra_funcs.make_shap_plots(
+    #         data_shap,
+    #         data_risc_scores,
+    #         models,
+    #         X_patient_male,
+    #         cfg_str,
+    #         fontsize=18,
+    #         use_FL=use_FL,
+    #         suffix="__male",
+    #     )
 
 plt.close("all")
 
