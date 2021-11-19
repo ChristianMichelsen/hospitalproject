@@ -15,8 +15,8 @@ plt.rcParams.update({"text.usetex": False})
 run_all_models = True
 plot_stuff = False
 # plot_stuff = True
-# save_stuff = False
-save_stuff = True
+save_stuff = False
+# save_stuff = True
 forced = False
 # forced = True
 
