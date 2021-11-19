@@ -486,6 +486,3 @@ print(f"Cutoff: {cutoff:.3f}")
 print(f"Worst patient: {y_pred_worst:.3f}, low age: {y_pred_worst_low_age:.3f}")
 print(f"Best patient: {y_pred_best:.3f}, high age: {y_pred_best_high_age:.3f}")
 # %%
-
-
-#%%

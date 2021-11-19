@@ -387,13 +387,13 @@ def get_table(X):
 
 def get_table_df(y_label):
 
-    d_data = get_data(y_label, exclude=["hospital", "year"])
+    d_data = get_data(y_label)
     X = d_data["X"]
     y = d_data["y"]
 
     d_table = {}
-    d_table["Signal"] = get_table(X.loc[y == 0])
-    d_table["Background"] = get_table(X.loc[y == 1])
+    d_table["Signal"] = get_table(X.loc[y == 1])
+    d_table["Background"] = get_table(X.loc[y == 0])
 
     df_table = pd.DataFrame(d_table)
     df_table["Missing"] = ["-"] * len(df_table)
