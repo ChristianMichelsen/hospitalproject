@@ -244,9 +244,7 @@ print("\n\n\n")
 if plot_stuff:
 
     print("Plotting stuff")
-
-    reload(extra_funcs)
-    # extra_funcs.create_length_of_stay_sig_bkg(data_df)
+    # reload(extra_funcs)
 
     extra_funcs.make_ROC_curves(
         data_risc_scores,
@@ -256,76 +254,25 @@ if plot_stuff:
         cuts=[(PPF - 0.05, PPF + 0.05)],
     )
 
-    # extra_funcs.make_beeswarm_shap_plots(data_shap, cfg_str)
-
-    # extra_funcs.plot_PPF_TPR(data_risc_scores, cfg_str)
-
-    # reload(extra_funcs)
-    # X_patient = extra_funcs.get_patient(data_all)
-
     extra_funcs.make_shap_plots(
         data_shap,
         cfg_str,
         fontsize=18,
-        # data_risc_scores,
-        # models,
-        # X_patient,
-        # use_FL=use_FL,
     )
 
-    # if False:
-    #     extra_funcs.make_shap_plots(
-    #         data_shap,
-    #         data_risc_scores,
-    #         models,
-    #         X_patient,
-    #         cfg_str,
-    #         fontsize=18,
-    #         use_FL=use_FL,
-    #         suffix="__with_walking_tool",
-    #     )
+# plt.close("all")
 
-    #     X_patient_no_walking = X_patient.copy()
-    #     X_patient_no_walking["walking_tool"] = 0
+# A = data_all["df"].query("outcome_A == 1")
+# B = data_all["df"].query("outcome_B == 1")
 
-    #     extra_funcs.make_shap_plots(
-    #         data_shap,
-    #         data_risc_scores,
-    #         models,
-    #         X_patient_no_walking,
-    #         cfg_str,
-    #         fontsize=18,
-    #         use_FL=use_FL,
-    #         suffix="__no_walking_tool",
-    #     )
+# print(len(A))
+# print(len(B))
 
-    #     X_patient_male = X_patient.copy()
-    #     X_patient_male["sex"] = 1
+# set_A = set(A.index)
+# set_B = set(B.index)
 
-    #     extra_funcs.make_shap_plots(
-    #         data_shap,
-    #         data_risc_scores,
-    #         models,
-    #         X_patient_male,
-    #         cfg_str,
-    #         fontsize=18,
-    #         use_FL=use_FL,
-    #         suffix="__male",
-    #     )
-
-plt.close("all")
-
-A = data_all["df"].query("outcome_A == 1")
-B = data_all["df"].query("outcome_B == 1")
-
-print(len(A))
-print(len(B))
-
-set_A = set(A.index)
-set_B = set(B.index)
-
-set_A.difference(set_B)
-len(set_B.difference(set_A))
+# set_A.difference(set_B)
+# len(set_B.difference(set_A))
 
 
 for y_label in y_labels:
@@ -361,6 +308,8 @@ print("\n\n\nfinished")
 
 if False:
 
+    from matplotlib.backends.backend_pdf import PdfPages
+
     d_translate = extra_funcs.d_translate
 
     y_label = "outcome_A"
@@ -370,119 +319,119 @@ if False:
 
         shap_values = data_shap[y_label][method]
 
-        fig, ax = plt.subplots(figsize=(10, 10))
-        shap.plots.scatter(
-            shap_values=shap_values[:, d_translate["group_ak"]],
-            color=shap_values[:, d_translate["family_vte"]],
-            ax=ax,
-            x_jitter=0.8,
-            alpha=0.8,
-        )
-        filename = f"./figures/shap_interation__{y_label}__{method}__AK-VTE.pdf"
-        fig.savefig(filename, dpi=300)
+        filename = f"./figures/shap_interation__{y_label}__{method}__ALL--age.pdf"
+        with PdfPages(filename) as pdf:
 
-        fig, ax = plt.subplots(figsize=(10, 10))
-        shap.plots.scatter(
-            shap_values=shap_values[:, d_translate["group_card"]],
-            color=shap_values[:, d_translate["hypertens"]],
-            ax=ax,
-            x_jitter=0.8,
-            alpha=0.5,
-        )
-        filename = f"./figures/shap_interation__{y_label}__{method}__card-hyper.pdf"
-        fig.savefig(filename, dpi=300)
+            for key in d_translate.keys():
+                fig, ax = plt.subplots(figsize=(10, 10))
+                shap.plots.scatter(
+                    shap_values=shap_values[:, d_translate[key]],
+                    color=shap_values[:, d_translate["age"]],
+                    ax=ax,
+                    x_jitter=0.8,
+                    alpha=0.5,
+                )
+                #
+                # fig.savefig(filename, dpi=300)
+                pdf.savefig(fig)  # or you can pass a Figure object to pdf.savefig
+                plt.close()
 
-        fig, ax = plt.subplots(figsize=(10, 10))
-        shap.plots.scatter(
-            shap_values=shap_values[:, d_translate["group_psych"]],
-            color=shap_values[:, d_translate["psd_knee"]],
-            ax=ax,
-            x_jitter=0.8,
-            alpha=0.5,
-        )
-        filename = f"./figures/shap_interation__{y_label}__{method}__psych-psd.pdf"
-        fig.savefig(filename, dpi=300)
+            # We can also set the file's metadata via the PdfPages object:
+            d = pdf.infodict()
+            d["Title"] = "SHAP interaction values"
+            d["Author"] = "Christian Michelsen"
 
-        fig, ax = plt.subplots(figsize=(10, 10))
-        shap.plots.scatter(
-            shap_values=shap_values[:, d_translate["group_psych"]],
-            color=shap_values[:, d_translate["age"]],
-            ax=ax,
-            x_jitter=0.8,
-            alpha=0.5,
-        )
-        filename = f"./figures/shap_interation__{y_label}__{method}__psych-age.pdf"
-        fig.savefig(filename, dpi=300)
+#%%
 
-        fig, ax = plt.subplots(figsize=(10, 10))
-        shap.plots.scatter(
-            shap_values=shap_values[:, d_translate["group_resp"]],
-            color=shap_values,
-            ax=ax,
-            x_jitter=0.8,
-            alpha=0.5,
-        )
-        filename = f"./figures/shap_interation__{y_label}__{method}__resp-color.pdf"
-        fig.savefig(filename, dpi=300)
 
-        fig, ax = plt.subplots(figsize=(10, 10))
-        shap.plots.scatter(
-            shap_values=shap_values[:, d_translate["group_resp"]],
-            ax=ax,
-            x_jitter=0.8,
-            alpha=0.5,
-        )
-        filename = f"./figures/shap_interation__{y_label}__{method}__resp.pdf"
-        fig.savefig(filename, dpi=300)
+if False:
 
-        fig, ax = plt.subplots(figsize=(10, 10))
-        shap.plots.scatter(
-            shap_values=shap_values[:, d_translate["N_total_prescriptions"]],
-            color=shap_values,
-            ax=ax,
-            x_jitter=0.8,
-            alpha=0.5,
-        )
-        filename = (
-            f"./figures/shap_interation__{y_label}__{method}__N_prescriptions.pdf"
-        )
-        fig.savefig(filename, dpi=300)
+    d_translate = extra_funcs.d_translate
+
+    y_label = "outcome_A"
+    method = "ML"
+
+    y_range = {
+        "outcome_A": {"ymin": -0.5, "ymax": 0.7},
+        "outcome_B": {"ymin": -0.1, "ymax": 0.4},
+    }
+
+    fignumbers = [
+        "3a)",
+        "3b)",
+        "3c)",
+        "3d)",
+    ]
+
+    for y_label in y_labels:
+        # break
+
+        shap_values = data_shap[y_label][method]
+
+        it = zip(filter(lambda s: "group" in s, d_translate.keys()), fignumbers)
+        for group, fignumber in it:
+            # break
+
+            fig, ax = plt.subplots(figsize=(10, 10))
+            ax.text(
+                0.98,
+                0.98,
+                fignumber,
+                horizontalalignment="right",
+                verticalalignment="top",
+                transform=ax.transAxes,
+                fontsize=18,
+            )
+            shap.plots.scatter(
+                shap_values=shap_values[:, d_translate[group]],
+                color=shap_values[:, d_translate["age"]],
+                ax=ax,
+                x_jitter=0.8,
+                alpha=0.8,
+                **y_range[y_label],
+            )
+
+            filename = (
+                f"./figures/shap_interation__{y_label}__{method}__{group}-age.pdf"
+            )
+            filename_png = filename.replace("figures/", "figures/pngs/").replace(
+                ".pdf", ".png"
+            )
+            fig.savefig(filename, dpi=300)
+            fig.savefig(filename_png, dpi=300)
 
 
 # %%
 
+if False:
 
-d_risc_scores = data_risc_scores["outcome_A"]["ML"]
-cutoff = d_risc_scores["cutoff"]
-y_pred_proba = d_risc_scores["y_pred_proba"]
+    d_risc_scores = data_risc_scores["outcome_A"]["ML"]
+    cutoff = d_risc_scores["cutoff"]
+    y_pred_proba = d_risc_scores["y_pred_proba"]
 
-worst = np.argmax(y_pred_proba)
-best = np.argmin(y_pred_proba)
+    worst = np.argmax(y_pred_proba)
+    best = np.argmin(y_pred_proba)
 
-d_risc_scores["y_test"].iloc[worst]
-d_risc_scores["y_test"].iloc[best]
+    d_risc_scores["y_test"].iloc[worst]
+    d_risc_scores["y_test"].iloc[best]
 
+    X_worst = data_all["X_test"].iloc[worst]
+    X_best = data_all["X_test"].iloc[best]
 
-X_worst = data_all["X_test"].iloc[worst]
-X_best = data_all["X_test"].iloc[best]
+    y_pred_worst = models["outcome_A"].predict(X_worst)[0]
+    y_pred_best = models["outcome_A"].predict(X_best)[0]
 
+    X_worst_low_age = X_worst.copy()
+    print(X_worst_low_age["age"])
+    X_worst_low_age["age"] = 18
+    X_best_high_age = X_best.copy()
+    print(X_best_high_age["age"])
+    X_best_high_age["age"] = 100
 
-y_pred_worst = models["outcome_A"].predict(X_worst)[0]
-y_pred_best = models["outcome_A"].predict(X_best)[0]
+    y_pred_worst_low_age = models["outcome_A"].predict(X_worst_low_age)[0]
+    y_pred_best_high_age = models["outcome_A"].predict(X_best_high_age)[0]
 
-X_worst_low_age = X_worst.copy()
-print(X_worst_low_age["age"])
-X_worst_low_age["age"] = 18
-X_best_high_age = X_best.copy()
-print(X_best_high_age["age"])
-X_best_high_age["age"] = 100
-
-
-y_pred_worst_low_age = models["outcome_A"].predict(X_worst_low_age)[0]
-y_pred_best_high_age = models["outcome_A"].predict(X_best_high_age)[0]
-
-
-print(f"Cutoff: {cutoff:.3f}")
-print(f"Worst patient: {y_pred_worst:.3f}, low age: {y_pred_worst_low_age:.3f}")
-print(f"Best patient: {y_pred_best:.3f}, high age: {y_pred_best_high_age:.3f}")
-# %%
+    print(f"Cutoff: {cutoff:.3f}")
+    print(f"Worst patient: {y_pred_worst:.3f}, low age: {y_pred_worst_low_age:.3f}")
+    print(f"Best patient: {y_pred_best:.3f}, high age: {y_pred_best_high_age:.3f}")
+    # %%

@@ -94,19 +94,19 @@ d_columns_rename = {
 
 
 d_translate = {
-    "sex": r"$\mathrm{Sex}$",
-    "civil_status": r"$\mathrm{Civil \,\, status}$",
+    "sex": r"$\mathrm{Gender}$",
+    "civil_status": r"$\mathrm{Living \,\, alone}$",
     "height": r"$\mathrm{Height}$",
     "weight": r"$\mathrm{Weight}$",
-    "hb": r"$\mathrm{HB}$",
+    "hb": r"$\mathrm{Hb}$",
     "smoking": r"$\mathrm{Smoking}$",
     "alcohol": r"$\mathrm{Alcohol}$",
-    "walking_tool": r"$\mathrm{Walking \,\, tool}$",
+    "walking_tool": r"$\mathrm{Walking \,\, aid}$",
     "rested": r"$\mathrm{Rested}$",
     "snore": r"$\mathrm{Snore}$",
-    "dm_type": r"$\mathrm{DM}$",
+    "dm_type": r"$\mathrm{Diabetes}$",
     # "hypertension_yes_or_prescription": r"$\mathrm{Hypertension}$",
-    "hyper_colesterol": r"$\mathrm{Colesterol}$",
+    "hyper_colesterol": r"$\mathrm{Hyper \,\, cholesterol}$",
     "cardiac_disease": r"$\mathrm{Cardiac}$",
     "pulmonary_disease": r"$\mathrm{Pulmonary}$",
     "cerebral_attack": r"$\mathrm{Cerebral}$",
@@ -125,13 +125,13 @@ d_translate = {
     # "day_of_week": r"$\mathrm{Week \,\, day}$",
     # "day_of_month": r"$\mathrm{Day \,\, of \,\, month}$",
     "antirheumatika": r"$\mathrm{Antirheumatika}$",
-    "group_ak": r"$\mathrm{AK \,\, (group)}$",
-    "group_card": r"$\mathrm{Card \,\, (group)}$",
-    "group_psych": r"$\mathrm{Psych \,\, (group)}$",
-    "group_resp": r"$\mathrm{Resp \,\, (group)}$",
+    "group_ak": r"$\mathrm{Prescribed \,\, anticoagulants}$",
+    "group_card": r"$\mathrm{Prescribed \,\, cardiac \,\, drugs}$",
+    "group_psych": r"$\mathrm{Psychotropics}$",
+    "group_resp": r"$\mathrm{Respiratory \,\, drugs}$",
     "steroid": r"$\mathrm{Steroid}$",
     "N_total_prescriptions": r"$N_\mathrm{prescriptions}$",
-    "cholesterol_medicine": r"$\mathrm{cholesterol \,\, (medicine)}$",
+    "cholesterol_medicine": r"$\mathrm{Prescribed \,\, anticholesterols}$",
     "hypertens": r"$\mathrm{hypertens}$",
 }
 
@@ -1636,7 +1636,7 @@ def make_risc_ROC_curve(
         r"$\mathrm{LR33}$",
         r"$\mathrm{ML10}$",
         r"$\mathrm{LR10}$",
-        r"$\mathrm{ML-NoAge}$",
+        r"$\mathrm{ML}$-$\mathrm{NoAge}$",
         r"$\mathrm{Age}$",
     ]
 
@@ -1922,8 +1922,8 @@ def shap_plot_global(
 
     if use_top10_model:
         key = "top10__top_10"
-        legend_ML = r"$\mathrm{ML-10}$"
-        legend_LR = r"$\mathrm{LR-10}$"
+        legend_ML = r"$\mathrm{ML10}$"
+        legend_LR = r"$\mathrm{LR10}$"
         d_shap[key] = d_shap[key].iloc[1:]
     else:
         key = "top10"
@@ -1968,23 +1968,24 @@ def shap_plot_global(
         + ax.get_xticklabels()
         + ax.get_yticklabels()
     ):
-        item.set_fontsize(24)
+        item.set_fontsize(22)
 
-    ax.xaxis.label.set_fontsize(30)
+    ax.xaxis.label.set_fontsize(28)
     ax.xaxis.set_major_locator(MaxNLocator(4))
 
     # # Only show ticks on the left and bottom spines
-    # ax.yaxis.set_ticks_position('left')
-    # ax.xaxis.set_ticks_position('bottom')
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.get_xaxis().tick_bottom()
     ax.get_yaxis().tick_left()
 
     ax.legend(
-        loc="lower right",
-        bbox_to_anchor=(0.99, 0.1),
-        fontsize=30,
+        bbox_to_anchor=(0.0, 1.02, 1.0, 0.102),
+        loc="lower left",
+        ncol=2,
+        mode="expand",
+        borderaxespad=0.0,
+        fontsize=24,
     )
 
 
@@ -1993,22 +1994,17 @@ from copy import deepcopy
 
 def make_shap_plots(
     data_shap,
-    # data_risc_scores,
-    # models,
-    # X_patient,
     cfg_str,
     fontsize=16,
-    # use_FL=False,
     suffix="",
 ):
 
-    colors = ["#377eb8", "#e41a1c"]
     colors = ["#096B91", "#E8542E"]
 
     for y_label, d_shap in data_shap.items():
         # break
 
-        fig, axes = plt.subplots(figsize=(18, 10), ncols=2)
+        fig, axes = plt.subplots(figsize=(18, 9), ncols=2)
         ax_global, ax_local = axes
 
         shap_plot_global(
@@ -2025,21 +2021,6 @@ def make_shap_plots(
             ax=ax_local,
             fig=fig,
         )
-        # shap.plots.beeswarm(shap_values, max_display=10, show=False)
-
-        # cutoff = data_risc_scores[y_label]["ML"]["cutoff"]
-        # model = models[y_label]
-
-        # shap_patient = get_shap_patient(model, X_patient, use_FL)
-
-        # shap_collection_patient = get_shap_plot_object(
-        #     shap_patient,
-        #     cutoff,
-        #     max_display=10,
-        # )
-
-        # make_local_shap_plot(ax_local, shap_collection_patient, fontsize=fontsize)
-
         fig.tight_layout()
 
         filename = f"./figures/shap__{y_label}__{cfg_str}{suffix}"
@@ -2284,9 +2265,9 @@ def beeswarm(
     ax.spines["top"].set_visible(False)
     ax.spines["left"].set_visible(False)
     # ax.tick_params(color=axis_color, labelcolor=axis_color)
-    ax.tick_params("y", labelsize=20, length=22, width=0.5, which="major")
-    ax.tick_params("x", labelsize=18)
-    ax.set_xlabel("SHAP value (impact on model output)", fontsize=22)
+    ax.tick_params("y", labelsize=22, length=22, width=0.5, which="major")
+    ax.tick_params("x", labelsize=22)
+    ax.set_xlabel("SHAP value (impact on model output)", fontsize=26)
     ax.set_yticks(range(len(feature_inds)))
     ax.set_yticklabels(reversed(yticklabels), fontsize=22)
     ax.set_ylim(-1, len(feature_inds))
