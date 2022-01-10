@@ -243,7 +243,7 @@ print("\n\n\n")
 
 if plot_stuff:
 
-    print("Plotting stuff")
+    print("plotting stuff")
     # reload(extra_funcs)
 
     extra_funcs.make_ROC_curves(
@@ -353,7 +353,7 @@ if False:
 
     y_range = {
         "outcome_A": {"ymin": -0.5, "ymax": 0.7},
-        "outcome_B": {"ymin": -0.1, "ymax": 0.4},
+        "outcome_B": {"ymin": -0.1, "ymax": 0.45},
     }
 
     fignumbers = [
@@ -372,23 +372,12 @@ if False:
         for group, fignumber in it:
             # break
 
-            fig, ax = plt.subplots(figsize=(10, 10))
-            ax.text(
-                0.98,
-                0.98,
+            fig, ax = extra_funcs.make_shap_scatter(
+                shap_values,
+                y_label,
+                group,
                 fignumber,
-                horizontalalignment="right",
-                verticalalignment="top",
-                transform=ax.transAxes,
-                fontsize=18,
-            )
-            shap.plots.scatter(
-                shap_values=shap_values[:, d_translate[group]],
-                color=shap_values[:, d_translate["age"]],
-                ax=ax,
-                x_jitter=0.8,
-                alpha=0.8,
-                **y_range[y_label],
+                y_range,
             )
 
             filename = (
@@ -397,9 +386,17 @@ if False:
             filename_png = filename.replace("figures/", "figures/pngs/").replace(
                 ".pdf", ".png"
             )
-            fig.savefig(filename, dpi=300)
-            fig.savefig(filename_png, dpi=300)
+            fig.savefig(filename, dpi=300, bbox_inches="tight")
+            fig.savefig(filename_png, dpi=300, bbox_inches="tight")
 
+#%%
+
+if False:
+    X_patient = extra_funcs.get_patient(data_all)
+    models["outcome_B"].predict(X_patient)
+    X_patient2 = X_patient.copy()
+    X_patient2["group_resp"] = 10.0
+    models["outcome_B"].predict(X_patient2)
 
 # %%
 
@@ -435,3 +432,8 @@ if False:
     print(f"Worst patient: {y_pred_worst:.3f}, low age: {y_pred_worst_low_age:.3f}")
     print(f"Best patient: {y_pred_best:.3f}, high age: {y_pred_best_high_age:.3f}")
     # %%
+
+
+#%%
+
+#%%

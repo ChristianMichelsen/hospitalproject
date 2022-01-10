@@ -2617,3 +2617,164 @@ def plot_PPF_TPR(data_risc_scores, cfg_str):
 
         filename = f"./figures/PPF_TPR__{cfg_str}__{y_label}.pdf"
         fig.savefig(filename)
+
+
+#%%
+
+
+# Prescribed anticoagulants
+d_group_ak = {
+    0: "None",
+    1: "VKA",
+    2: "Heparin+ASA",
+    3: "DOAC",
+    4: "ASA",
+    5: "Dipyradimol",
+    6: "ADP",
+    7: "ASA+Dipyradimol",
+    8: "VKA+ASA",
+    9: "DOAC+ASA",
+    10: "VKA+ADP",
+    11: "DOAC+ADP",
+    12: "VKA+Heparin",
+    # 13:
+    14: "DOAC+ASA+ADP",
+    15: "ASA+ADP",
+    16: "ASA+ADP+Heparin",
+    17: "ASA+ADP+Dipyradimol",
+}
+
+
+# Prescribed cardiac drugs
+d_group_card = {
+    0: "None",
+    1: "diuretics",
+    2: "angiotensin-II/ACE-inhib",
+    3: "Ca^{2+}-antagonists",
+    4: "betablockers",
+    5: "nitrates",
+    6: "other AHT",
+    7: "other IHD-drugs",
+    # 8: ,
+    9: "2 antihypertensives",
+    10: "β-blocker & 1 AHT",
+    11: "3 AHT",
+    12: "β-blocker & 2 AHT",
+    13: "β-blocker & 3 AHT",
+    14: "4 AHT",
+    15: "β-blocker & 4 AHT",
+    16: "other AHT & AHT",
+    17: "nitrates & any AHT",
+    18: "other IHD-drugs & any AHT/nitrate",
+    19: "other antiarrythmics & any ATH",
+}
+
+# Psychotropics
+d_group_psych = {
+    0: "None",
+    1: "SSRI/SNRI/NaRI",
+    2: "other AD",
+    3: "antipsychotics",
+    4: "BZ",
+    5: "anticholinergics/memantine",
+    6: "anti-ADHD",
+    7: "NaSSA",
+    8: "other psychotropics",
+    9: "SSRI & other AD",
+    10: "SSRI & NaSSA",
+    11: "SSRI & antipsychotics",
+    12: "SSRI & other psychotropics",
+    13: "BZ+ any psychotropic",
+    14: "antipsychotics + any psychotropic",
+    15: "anti-ADHD + any psychotropic",
+    16: "NaSSA + any psychotropic",
+    17: "other psychotropic & any specified psychotropic",
+}
+
+# Respiratory drugs
+d_group_resp = {
+    0: "None",
+    1: "SABA",
+    2: "LABA or LAMA",
+    3: "inhalation steroid",
+    4: "SABA & Ipratropium",
+    5: "LABA & steroid",
+    6: "LABA & LAMA & steroid",
+    7: "LAMA & steroid",
+    8: "LABA & LAMA",
+    9: "other pulmonary drug",
+    10: "other pulmonary drug & steroid",
+    11: "SABA & LABA or LAMA",
+    12: "SABA & LAMA or LABA & steroid",
+}
+
+
+d_labels = {
+    "group_ak": d_group_ak,
+    "group_card": d_group_card,
+    "group_psych": d_group_psych,
+    "group_resp": d_group_resp,
+}
+d_xaxis = {
+    "group_ak": "Prescribed anticoagulants",
+    "group_card": "Prescribed cardiac drugs",
+    "group_psych": "Psychotropics",
+    "group_resp": "Respiratory drugs",
+}
+
+
+def make_shap_scatter(shap_values, y_label, group, fignumber, y_range):
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+    ax.text(
+        0.98,
+        0.98,
+        fignumber,
+        horizontalalignment="right",
+        verticalalignment="top",
+        transform=ax.transAxes,
+        fontsize=18,
+    )
+    ax.text(
+        0.99,
+        0.02,
+        d_xaxis[group],
+        horizontalalignment="right",
+        verticalalignment="bottom",
+        transform=ax.transAxes,
+        fontsize=16,
+    )
+
+    shap_corrected = deepcopy(shap_values[:, d_translate[group]])
+    d = {from_: to for to, from_ in enumerate(np.unique(shap_corrected.data))}
+    shap_corrected.data = np.array([d[val] for val in shap_corrected.data])
+
+    shap.plots.scatter(
+        shap_values=shap_corrected,
+        hist=False,
+        color=shap_values[:, d_translate["age"]],
+        ax=ax,
+        x_jitter=0.8,
+        alpha=0.8,
+        **y_range[y_label],
+    )
+    plt.close("all")
+
+    labels = list(d_labels[group].values())
+    ticks = np.arange(len(labels))
+
+    ax.set_xticks(ticks)
+    ax.set_xticklabels(labels)
+    # ax.tick_params(axis="x", rotation=45)
+    # fig.autofmt_xdate(bottom=0.2, rotation=30, ha='right')
+    # ax.set_xticklabels(labels, rotation=35, ha="right", position=(10, 0.01))
+    plt.setp(
+        ax.get_xticklabels(),
+        rotation=35,
+        ha="right",
+        rotation_mode="anchor",
+    )
+    ax.set_xlabel("")
+    ax.set_ylabel("SHAP value")
+
+    return fig, ax
