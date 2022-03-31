@@ -1,12 +1,15 @@
+#%%
+from collections import defaultdict
+from importlib import reload
+from pathlib import Path
+
+import joblib
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from importlib import reload
-import extra_funcs
 import shap
-from collections import defaultdict
-from pathlib import Path
-import joblib
+
+import extra_funcs
 
 # plt.rcParams.update({"text.usetex": True})
 plt.rcParams.update({"text.usetex": False})
@@ -277,6 +280,8 @@ if plot_stuff:
 
 for y_label in y_labels:
 
+    print(y_label)
+
     name = f"{y_label}__ML__{cfg_str}"
     filename_optuna = f"./models/optuna__{name}.pkl"
 
@@ -293,6 +298,8 @@ for y_label in y_labels:
     print("  Params: ")
     for key_, value in d_optuna_all.items():
         print(f"    {key_}: {value}")
+
+    print("\n\n")
 
 
 print("\n\n\nfinished")

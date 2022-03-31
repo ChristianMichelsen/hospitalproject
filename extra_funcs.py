@@ -1,34 +1,33 @@
+import os
+import platform
+from copy import copy
+from pathlib import Path
+
+import lightgbm as lgb
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from pathlib import Path
-from copy import copy
-from sklearn.impute import SimpleImputer
-import matplotlib.pyplot as plt
-import lightgbm as lgb
 import shap
+from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
+    accuracy_score,
     auc,
+    average_precision_score,
+    classification_report,
+    cohen_kappa_score,
+    confusion_matrix,
     f1_score,
     fbeta_score,
-    accuracy_score,
-    confusion_matrix,
-    classification_report,
-    roc_curve,
-    roc_auc_score,
-    average_precision_score,
+    matthews_corrcoef,
+    precision_recall_curve,
     precision_recall_fscore_support,
     recall_score,
-    classification_report,
-    precision_recall_curve,
-    matthews_corrcoef,
-    cohen_kappa_score,
+    roc_auc_score,
+    roc_curve,
 )
-
-import platform
-import os
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 
 def is_hep():
@@ -586,8 +585,8 @@ def extract_data_risc_scores(dicts):
 # #%%
 
 import numpy as np
-from scipy.optimize import minimize_scalar
 from scipy import special
+from scipy.optimize import minimize_scalar
 
 
 class FocalLoss:
@@ -654,8 +653,8 @@ class FocalLoss:
 #%%
 
 
-from numba import njit
 import numba as nb
+from numba import njit
 from numba.core import types
 from numba.typed import Dict
 
@@ -838,7 +837,7 @@ def _compute_performance_measures(y_true, y_pred):
     return d_out
 
 
-from sklearn.metrics import roc_auc_score, average_precision_score
+from sklearn.metrics import average_precision_score, roc_auc_score
 
 
 def compute_PRG_AUC(y_true, y_pred_proba):
@@ -940,8 +939,8 @@ def add_model_risc_score1(dicts, y_label, key, PPF_cut):
 
 #%%
 
-from sklearn.linear_model import LogisticRegression
 from sklearn import preprocessing
+from sklearn.linear_model import LogisticRegression
 
 
 def add_model_LR(dicts, y_label, key, PPF_cut, exclude=None, include=None):
@@ -967,12 +966,11 @@ def add_model_LR(dicts, y_label, key, PPF_cut, exclude=None, include=None):
 
 #%%
 
+import joblib
 import optuna
-from optuna.samplers import TPESampler
 from optuna.integration import LightGBMPruningCallback
 from optuna.pruners import MedianPruner
-import joblib
-
+from optuna.samplers import TPESampler
 
 #%%
 
@@ -1395,10 +1393,10 @@ def extract_data_ROC(dicts):
 
 #%%
 
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
-from matplotlib.ticker import PercentFormatter, MaxNLocator
-import seaborn as sns
 import matplotlib.patches as mpatches
+import seaborn as sns
+from matplotlib.ticker import MaxNLocator, PercentFormatter
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 
 
 def compute_suitable_area(d_ROC, PPF_cut_min, PPF_cut_max):
@@ -1874,10 +1872,10 @@ def extract_data_shap(
 
 #%%
 
-from matplotlib.ticker import PercentFormatter
-from matplotlib.ticker import PercentFormatter, MaxNLocator
 import colorsys
+
 import matplotlib
+from matplotlib.ticker import MaxNLocator, PercentFormatter
 
 
 def scale_lightness(rgb, scale_l):
@@ -2037,9 +2035,9 @@ def make_shap_plots(
 
 
 from shap import Explanation
-from shap.plots._labels import labels
-from shap.plots._utils import convert_ordering, convert_color
 from shap.plots import colors
+from shap.plots._labels import labels
+from shap.plots._utils import convert_color, convert_ordering
 from shap.utils import safe_isinstance
 
 
