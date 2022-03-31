@@ -22,6 +22,7 @@ save_stuff = False
 # save_stuff = True
 forced = False
 # forced = True
+add_ML_26 = True
 
 use_FL = False
 # use_FL = True
@@ -57,6 +58,7 @@ optimize = "AUC"  # "average_precision"
 cfg["optimize"] = optimize  # "TPR", "focal_loss", "AUC", "average_precision"
 cfg["FL_str"] = FL_str
 cfg["PPF"] = PPF
+cfg["add_ML_26"] = add_ML_26
 
 cfg_str = extra_funcs.cfg_to_str(cfg)
 cfg_str_with_PPF = f"{cfg_str}__{PPF:.2f}"
@@ -180,6 +182,21 @@ else:
                 PPF_cut=PPF,
             )
 
+        if add_ML_26:
+            df, X, y = extra_funcs.load_df_X_y_26(y_label)
+            extra_funcs.add_ML_model(
+                cfg=cfg,
+                dicts=dicts,
+                y_label=y_label,
+                key=f"ML__26",
+                use_FL=use_FL,
+                name=f"{y_label}__ML__{cfg_str}",
+                PPF_cut=PPF,
+                df=df,
+                X=X,
+                y=y,
+            )
+
         #%%
 
         shap_ordered_columns = extra_funcs.get_shap_ordered_columns(
@@ -255,6 +272,7 @@ if plot_stuff:
         cfg_str_with_PPF,
         include_ML__exclude_age=True,
         cuts=[(PPF - 0.05, PPF + 0.05)],
+        add_ML_26=add_ML_26,
     )
 
     extra_funcs.make_shap_plots(

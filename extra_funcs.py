@@ -269,14 +269,17 @@ def get_train_test_splits(df_train_val, time_intervals_val):
     return cv_splits
 
 
-def get_data(y_label, exclude=None, include=None, filename=filename_csv):
+def get_data(
+    y_label, exclude=None, include=None, filename=filename_csv, df=None, X=None, y=None
+):
 
     if exclude is not None and include is not None:
         raise AssertionError(f"exclude and include cannot both be set.")
 
     # load data
-    df = load_entire_dataframe(filename=filename)
-    X, y = df_to_X_y(df, y_label)
+    if df is None and X is None and y is None:
+        df = load_entire_dataframe(filename=filename)
+        X, y = df_to_X_y(df, y_label)
 
     if exclude is not None:
 
@@ -447,9 +450,9 @@ def get_lgb_datasets(d_data):
 def pandas_to_lgb_dataset(
     X,
     y,
-    columns_cat_all,
-    columns_cat_subset,
-    method,
+    columns_cat_all=None,
+    columns_cat_subset=None,
+    method="",
     init_score=None,
 ):
 
@@ -1123,6 +1126,9 @@ def add_ML_model(
     use_FL=False,
     exclude=None,
     include=None,
+    df=None,
+    X=None,
+    y=None,
 ):
 
     print(f"\n\nFitting ML model {key}. \n\n")
@@ -1130,7 +1136,7 @@ def add_ML_model(
     cfg = copy(cfg)
     cfg["exclude"] = exclude
 
-    d_data = get_data(y_label, exclude=exclude, include=include)
+    d_data = get_data(y_label, exclude=exclude, include=include, df=df, X=X, y=y)
     dicts["data"][key] = d_data
 
     # define lgb datasets
@@ -1272,7 +1278,7 @@ def add_ML_model(
             params,
             dataset_train,
             num_boost_round=d_optuna_all["num_boost_round"],
-            verbose_eval=100,
+            # verbose_eval=100,
         )
 
     dicts["y_pred_proba"][key] = model.predict(d_data["X_test"])
@@ -1304,23 +1310,19 @@ def get_df_results(dicts):
         ]
     # fmt:on
 
+    index = [
+        "ML",
+        "LR",
+        "ML__top_10",
+        "LR__top_10",
+        "only_age",
+    ]
+
     if "ML__exclude_age" in df_results.index:
-        index = [
-            "ML",
-            "LR",
-            "ML__top_10",
-            "LR__top_10",
-            "ML__exclude_age",
-            "only_age",
-        ]
-    else:
-        index = [
-            "ML",
-            "LR",
-            "ML__top_10",
-            "LR__top_10",
-            "only_age",
-        ]
+        index.insert(4, "ML__exclude_age")
+
+    if "ML__26" in df_results.index:
+        index.append("ML__26")
 
     df_results_save = df_results.loc[
         index,
@@ -1618,6 +1620,7 @@ def make_risc_ROC_curve(
     PPF_cut_min,
     PPF_cut_max,
     include_ML__exclude_age=False,
+    add_ML_26=False,
 ):
 
     keys = [
@@ -1659,6 +1662,11 @@ def make_risc_ROC_curve(
             "^",
         ]
 
+    if add_ML_26:
+        keys.append("ML__26")
+        names.append(r"$\mathrm{ML26}$")
+        markers.append("s")
+
     # colors = ["#377eb8", "#e41a1c", "#84BDEB", "#f5abc9", "#048b00"]
     colors = [
         "#096B91",
@@ -1667,6 +1675,7 @@ def make_risc_ROC_curve(
         "#FF8D30",
         "#048B00",
         "#3EC106",
+        "#A65628",
     ]
 
     fig, axes = plt.subplots(figsize=(15, 6), ncols=2, nrows=1)
@@ -1695,6 +1704,7 @@ def make_ROC_curves(
     cfg_str,
     include_ML__exclude_age=False,
     cuts=None,
+    add_ML_26=False,
 ):
 
     # PPF_cut_min, PPF_cut_max = 0.125, 0.275
@@ -1718,6 +1728,7 @@ def make_ROC_curves(
                 PPF_cut_min=PPF_cut_min,
                 PPF_cut_max=PPF_cut_max,
                 include_ML__exclude_age=include_ML__exclude_age,
+                add_ML_26=add_ML_26,
             )
 
             figname = f"./figures/ROC__{y_label}__{cfg_str}__{PPF_cut_min:.3f}__{PPF_cut_max:.3f}.pdf"
@@ -2776,3 +2787,48 @@ def make_shap_scatter(shap_values, y_label, group, fignumber, y_range):
     ax.set_ylabel("SHAP value")
 
     return fig, ax
+
+
+#%%
+
+
+def load_df_X_y_26(y_label):
+
+    cols = np.array(
+        [
+            "sex",
+            "joint",
+            "hb",
+            "kidney",
+            "height",
+            "weight",
+            "bmi",
+            "smoking",
+            "alcohol",
+            "civil_status",
+            "walking_tool",
+            "dm_type",
+            "cardiac_disease",
+            "pulmonary_disease",
+            "psd_knee",
+            "cerebral_attack",
+            "group_ak",
+            "steroid",
+            "group_card",
+            "group_psych",
+            "group_resp",
+            "cholesterol_medicine",
+            "antirheumatika",
+            "hypertens",
+            "age",  # ?
+            "year",  # ?
+        ]
+    )
+
+    df = load_entire_dataframe()
+
+    X_full, y = df_to_X_y(df, y_label)
+    cols_ordered = [col for col in X_full.columns if col in cols]
+    X = X_full.loc[:, cols_ordered]
+
+    return df, X, y
