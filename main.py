@@ -183,7 +183,7 @@ else:
             )
 
         if add_ML_26:
-            df, X, y = extra_funcs.load_df_X_y_26(y_label)
+            cols_26_ordered = extra_funcs.load_cols_26(y_label)
             extra_funcs.add_ML_model(
                 cfg=cfg,
                 dicts=dicts,
@@ -191,10 +191,8 @@ else:
                 key=f"ML__26",
                 use_FL=use_FL,
                 name=f"{y_label}__ML__{cfg_str}",
+                include=cols_26_ordered,
                 PPF_cut=PPF,
-                df=df,
-                X=X,
-                y=y,
             )
 
         #%%

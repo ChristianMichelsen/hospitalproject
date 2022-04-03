@@ -2792,7 +2792,7 @@ def make_shap_scatter(shap_values, y_label, group, fignumber, y_range):
 #%%
 
 
-def load_df_X_y_26(y_label):
+def load_cols_26(y_label):
 
     cols = np.array(
         [
@@ -2829,6 +2829,4 @@ def load_df_X_y_26(y_label):
 
     X_full, y = df_to_X_y(df, y_label)
     cols_ordered = [col for col in X_full.columns if col in cols]
-    X = X_full.loc[:, cols_ordered]
-
-    return df, X, y
+    return cols_ordered
