@@ -2,6 +2,7 @@ old/
 data*
 models/
 figures/
+_figures/
 results/
 *.joblib
 *.pkl

@@ -31,6 +31,7 @@ FL_str = "use_FL" if use_FL else "no_FL"
 y_label = "outcome_B"
 y_label = "outcome_A"
 y_labels = ["outcome_A", "outcome_B"]
+# y_labels = ["outcome_A"]  #
 
 # PPF = 0.10
 # PPF = 0.15
@@ -190,7 +191,8 @@ else:
                 y_label=y_label,
                 key=f"ML__26",
                 use_FL=use_FL,
-                name=f"{y_label}__ML__{cfg_str}",
+                # name=f"{y_label}__ML__{cfg_str}",
+                name=f"{y_label}__ML__26__{cfg_str}",
                 include=cols_26_ordered,
                 PPF_cut=PPF,
             )

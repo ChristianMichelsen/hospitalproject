@@ -3,12 +3,17 @@ import platform
 from copy import copy
 from pathlib import Path
 
+import joblib
 import lightgbm as lgb
 import matplotlib.pyplot as plt
 import numpy as np
+import optuna
 import pandas as pd
 import seaborn as sns
 import shap
+from optuna.integration import LightGBMPruningCallback
+from optuna.pruners import MedianPruner
+from optuna.samplers import TPESampler
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
     accuracy_score,
@@ -28,6 +33,8 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+
+#%%
 
 
 def is_hep():
@@ -270,7 +277,13 @@ def get_train_test_splits(df_train_val, time_intervals_val):
 
 
 def get_data(
-    y_label, exclude=None, include=None, filename=filename_csv, df=None, X=None, y=None
+    y_label,
+    exclude=None,
+    include=None,
+    filename=filename_csv,
+    df=None,
+    X=None,
+    y=None,
 ):
 
     if exclude is not None and include is not None:
@@ -873,7 +886,6 @@ def compute_performance_measures(dicts, key, PPF_cut, cutoff=None):
         y_pred_proba = y_pred_proba.values
 
     d_out = dict(_compute_performance_measures(y_true, y_pred))
-
     for measure in ["TP", "FP", "FN", "TN"]:
         d_out[measure] = int(d_out[measure])
 
@@ -968,12 +980,6 @@ def add_model_LR(dicts, y_label, key, PPF_cut, exclude=None, include=None):
 
 
 #%%
-
-import joblib
-import optuna
-from optuna.integration import LightGBMPruningCallback
-from optuna.pruners import MedianPruner
-from optuna.samplers import TPESampler
 
 #%%
 
