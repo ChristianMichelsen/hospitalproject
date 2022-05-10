@@ -31,7 +31,7 @@ FL_str = "use_FL" if use_FL else "no_FL"
 y_label = "outcome_B"
 y_label = "outcome_A"
 y_labels = ["outcome_A", "outcome_B"]
-# y_labels = ["outcome_A"]  #
+y_labels = ["outcome_A"]  #
 
 # PPF = 0.10
 # PPF = 0.15
@@ -348,6 +348,7 @@ if False:
         with PdfPages(filename) as pdf:
 
             for key in d_translate.keys():
+
                 fig, ax = plt.subplots(figsize=(10, 10))
                 shap.plots.scatter(
                     shap_values=shap_values[:, d_translate[key]],
@@ -462,3 +463,72 @@ if False:
 #%%
 
 #%%
+
+#%%
+
+
+#%%
+
+
+#%%
+
+
+# %%
+
+
+if False:
+
+    from copy import deepcopy
+
+    d_translate = extra_funcs.d_translate
+
+    shaps = data_shap["outcome_A"]["ML"]
+
+    shaps_hb = shaps[:, d_translate["hb"]]
+    shaps_sex = shaps[:, d_translate["sex"]]
+    shaps_joint = shaps[:, d_translate["joint"]]
+
+    mask_women = shaps_sex.data == 0
+    mask_men = shaps_sex.data == 1
+
+    mask_knee = shaps_joint.data == 0
+    mask_hip = shaps_joint.data == 1
+
+    limits = {
+        "ymin": np.min(shaps_hb.values),
+        "ymax": np.max(shaps_hb.values),
+        "xmin": np.nanmin(shaps_hb.data),
+        "xmax": np.nanmax(shaps_hb.data),
+    }
+
+    fig_hb = extra_funcs.plot_shap_hb(shaps_hb, limits)
+    filename = f"./figures/shap_interation__outcome_A__ML__hb.pdf"
+    fig_hb.savefig(filename, dpi=300, bbox_inches="tight")
+
+    shaps_hb_women = extra_funcs.get_masked_version(shaps_hb, mask_women)
+    shaps_hb_men = extra_funcs.get_masked_version(shaps_hb, mask_men)
+    fig_hb_gender = extra_funcs.plot_shap_hb_2_split(
+        shaps_hb,
+        shaps_hb_women,
+        shaps_hb_men,
+        limits,
+        "Women",
+        "Men",
+    )
+    filename = f"./figures/shap_interation__outcome_A__ML__hb__gender.pdf"
+    fig_hb_gender.savefig(filename, dpi=300, bbox_inches="tight")
+
+    shaps_hb_hip = extra_funcs.get_masked_version(shaps_hb, mask_hip)
+    shaps_hb_knee = extra_funcs.get_masked_version(shaps_hb, mask_knee)
+    fig_hb_hip_kneww = extra_funcs.plot_shap_hb_2_split(
+        shaps_hb,
+        shaps_hb_hip,
+        shaps_hb_knee,
+        limits,
+        "Hip",
+        "Knee",
+    )
+    filename = f"./figures/shap_interation__outcome_A__ML__hb__hip-knee.pdf"
+    fig_hb_hip_kneww.savefig(filename, dpi=300, bbox_inches="tight")
+
+    # %%

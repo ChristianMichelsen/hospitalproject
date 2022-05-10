@@ -2836,3 +2836,159 @@ def load_cols_26(y_label):
     X_full, y = df_to_X_y(df, y_label)
     cols_ordered = [col for col in X_full.columns if col in cols]
     return cols_ordered
+
+
+#%%
+
+
+def get_masked_version(shaps_in, mask):
+    shaps = deepcopy(shaps_in)
+
+    shaps.values = shaps.values[mask]
+    shaps.data = shaps.data[mask]
+    shaps.base_values = shaps.base_values[mask]
+
+    return shaps
+
+
+from scipy.optimize import curve_fit
+
+
+def logistic_curve(x, a, b, c, d):
+    """
+    Logistic function with parameters a, b, c, d
+    a is the curve's maximum value (top asymptote)
+    b is the curve's minimum value (bottom asymptote)
+    c is the logistic growth rate or steepness of the curve
+    d is the x value of the sigmoid's midpoint
+    """
+    return ((a - b) / (1 + np.exp(-c * (x - d)))) + b
+
+
+def fit_logistic(shaps):
+
+    x = shaps.data
+    y = shaps.values
+    nans = np.isnan(x)
+    x = x[~nans]
+    y = y[~nans]
+
+    p0 = [0.5, -0.2, 0.1, 8.0]
+    logistic_params, covariance = curve_fit(logistic_curve, x, y, p0=p0)
+
+    return logistic_params, covariance
+
+
+def compute_y0(logistic_params):
+    a, b, c, d = logistic_params
+    y0 = np.log(-a / b) / (-c) + d
+    return y0
+
+
+def compute_y0_std(logistic_params, covariance):
+    mult_norm = np.random.multivariate_normal
+    y0s = [compute_y0(mult_norm(logistic_params, covariance)) for _ in range(10_000)]
+    return np.std(y0s)
+
+
+def plot_logistic(ax, logistic_params, covariance, limits, ypos_text=0.85):
+    xx = np.linspace(limits["xmin"], limits["xmax"], 1000)
+    yy = logistic_curve(xx, *logistic_params)
+    ax.plot(xx, yy, ls="-", c="k")
+
+    y0 = compute_y0(logistic_params)
+    y0_std = compute_y0_std(logistic_params, covariance)
+
+    s = f"SHAP = 0 => \nhb = {y0:.4f} +/- {y0_std:.4f}"
+
+    ax.text(
+        0.99,
+        ypos_text,
+        s,
+        horizontalalignment="right",
+        verticalalignment="top",
+        transform=ax.transAxes,
+        fontsize=16,
+    )
+
+
+def plot_shap_hb(shaps_hb, limits):
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    logistic_params, covariance = fit_logistic(shaps_hb)
+    plot_logistic(ax, logistic_params, covariance, limits, ypos_text=0.99)
+
+    ax.axhline(y=0, ls="--", c="k", alpha=0.5)
+
+    shap.plots.scatter(
+        shap_values=shaps_hb,
+        ax=ax,
+        # x_jitter=1,
+        alpha=0.2,
+        color="C2",
+        **limits,
+    )
+    plt.close("all")
+
+    return fig
+
+
+def plot_shap_hb_2_split(
+    shaps_hb,
+    shaps_hb_mask1,
+    shaps_hb_mask2,
+    limits,
+    name1,
+    name2,
+):
+
+    fig, (ax1, ax2) = plt.subplots(figsize=(10, 10), nrows=2, sharex=True)
+
+    logistic_params_1, covariance_1 = fit_logistic(shaps_hb_mask1)
+    plot_logistic(ax1, logistic_params_1, covariance_1, limits)
+
+    ax1.axhline(y=0, ls="--", c="k", alpha=0.5)
+    ax1.text(
+        0.99,
+        0.99,
+        name1,
+        horizontalalignment="right",
+        verticalalignment="top",
+        transform=ax1.transAxes,
+        fontsize=16,
+    )
+
+    shap.plots.scatter(
+        shap_values=shaps_hb_mask1,
+        ax=ax1,
+        # x_jitter=1,
+        alpha=0.2,
+        color="C3",
+        **limits,
+    )
+    plt.close("all")
+
+    logistic_params_2, covariance_2 = fit_logistic(shaps_hb_mask2)
+    plot_logistic(ax2, logistic_params_2, covariance_2, limits)
+
+    ax2.axhline(y=0, ls="--", c="k", alpha=0.5)
+    ax2.text(
+        0.99,
+        0.99,
+        name2,
+        horizontalalignment="right",
+        verticalalignment="top",
+        transform=ax2.transAxes,
+        fontsize=16,
+    )
+    shap.plots.scatter(
+        shap_values=shaps_hb_mask2,
+        ax=ax2,
+        # x_jitter=1,
+        alpha=0.2,
+        color="C0",
+        **limits,
+    )
+
+    return fig
