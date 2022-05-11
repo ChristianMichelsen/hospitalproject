@@ -462,19 +462,6 @@ if False:
 
 #%%
 
-#%%
-
-#%%
-
-
-#%%
-
-
-#%%
-
-
-# %%
-
 
 if False:
 
@@ -485,6 +472,7 @@ if False:
     shaps = data_shap["outcome_A"]["ML"]
 
     shaps_hb = shaps[:, d_translate["hb"]]
+    shaps_age = shaps[:, d_translate["age"]]
     shaps_sex = shaps[:, d_translate["sex"]]
     shaps_joint = shaps[:, d_translate["joint"]]
 
@@ -501,34 +489,42 @@ if False:
         "xmax": np.nanmax(shaps_hb.data),
     }
 
-    fig_hb = extra_funcs.plot_shap_hb(shaps_hb, limits)
+    fig_hb = extra_funcs.plot_shap_hb(shaps_hb, shaps_age, limits)
     filename = f"./figures/shap_interation__outcome_A__ML__hb.pdf"
     fig_hb.savefig(filename, dpi=300, bbox_inches="tight")
 
     shaps_hb_women = extra_funcs.get_masked_version(shaps_hb, mask_women)
     shaps_hb_men = extra_funcs.get_masked_version(shaps_hb, mask_men)
+    shaps_age_women = extra_funcs.get_masked_version(shaps_age, mask_women)
+    shaps_age_men = extra_funcs.get_masked_version(shaps_age, mask_men)
     fig_hb_gender = extra_funcs.plot_shap_hb_2_split(
         shaps_hb,
         shaps_hb_women,
         shaps_hb_men,
+        shaps_age_women,
+        shaps_age_men,
         limits,
         "Women",
         "Men",
     )
+
     filename = f"./figures/shap_interation__outcome_A__ML__hb__gender.pdf"
     fig_hb_gender.savefig(filename, dpi=300, bbox_inches="tight")
 
     shaps_hb_hip = extra_funcs.get_masked_version(shaps_hb, mask_hip)
     shaps_hb_knee = extra_funcs.get_masked_version(shaps_hb, mask_knee)
-    fig_hb_hip_kneww = extra_funcs.plot_shap_hb_2_split(
+    shaps_age_hip = extra_funcs.get_masked_version(shaps_age, mask_hip)
+    shaps_age_knee = extra_funcs.get_masked_version(shaps_age, mask_knee)
+
+    fig_hb_hip_knee = extra_funcs.plot_shap_hb_2_split(
         shaps_hb,
         shaps_hb_hip,
         shaps_hb_knee,
+        shaps_age_hip,
+        shaps_age_knee,
         limits,
         "Hip",
         "Knee",
     )
     filename = f"./figures/shap_interation__outcome_A__ML__hb__hip-knee.pdf"
-    fig_hb_hip_kneww.savefig(filename, dpi=300, bbox_inches="tight")
-
-    # %%
+    fig_hb_hip_knee.savefig(filename, dpi=300, bbox_inches="tight")

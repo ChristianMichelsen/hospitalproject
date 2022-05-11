@@ -2912,7 +2912,14 @@ def plot_logistic(ax, logistic_params, covariance, limits, ypos_text=0.85):
     )
 
 
-def plot_shap_hb(shaps_hb, limits):
+def fix_colorbar_shap(ax, alpha=0.5):
+    cb = ax.collections[0].colorbar
+    cb.set_alpha(alpha)
+    cb.draw_all()
+    cb.ax.set_aspect(1)
+
+
+def plot_shap_hb(shaps_hb, shaps_age, limits):
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -2923,13 +2930,16 @@ def plot_shap_hb(shaps_hb, limits):
 
     shap.plots.scatter(
         shap_values=shaps_hb,
+        color=shaps_age,
         ax=ax,
         # x_jitter=1,
         alpha=0.2,
-        color="C2",
+        # color="C2",
         **limits,
     )
     plt.close("all")
+
+    fix_colorbar_shap(ax)
 
     return fig
 
@@ -2938,6 +2948,8 @@ def plot_shap_hb_2_split(
     shaps_hb,
     shaps_hb_mask1,
     shaps_hb_mask2,
+    shaps_age_mask1,
+    shaps_age_mask2,
     limits,
     name1,
     name2,
@@ -2964,9 +2976,11 @@ def plot_shap_hb_2_split(
         ax=ax1,
         # x_jitter=1,
         alpha=0.2,
-        color="C3",
+        color=shaps_age_mask1,
         **limits,
     )
+    fix_colorbar_shap(ax1)
+
     plt.close("all")
 
     logistic_params_2, covariance_2 = fit_logistic(shaps_hb_mask2)
@@ -2987,8 +3001,10 @@ def plot_shap_hb_2_split(
         ax=ax2,
         # x_jitter=1,
         alpha=0.2,
-        color="C0",
+        color=shaps_age_mask2,
         **limits,
     )
+
+    fix_colorbar_shap(ax2)
 
     return fig
