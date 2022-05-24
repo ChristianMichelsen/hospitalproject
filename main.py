@@ -528,3 +528,93 @@ if False:
     )
     filename = f"./figures/shap_interation__outcome_A__ML__hb__hip-knee.pdf"
     fig_hb_hip_knee.savefig(filename, dpi=300, bbox_inches="tight")
+
+
+#%%
+
+if True:
+
+    from copy import deepcopy
+
+    d_translate = extra_funcs.d_translate
+
+    shaps = data_shap["outcome_A"]["ML"]
+
+    shaps_hb = shaps[:, d_translate["hb"]]
+    shaps_age = shaps[:, d_translate["age"]]
+    shaps_sex = shaps[:, d_translate["sex"]]
+    shaps_joint = shaps[:, d_translate["joint"]]
+
+    mask_women = shaps_sex.data == 0
+    mask_men = shaps_sex.data == 1
+
+    mask_knee = shaps_joint.data == 0
+    mask_hip = shaps_joint.data == 1
+
+    limits = {
+        "ymin": np.min(shaps_age.values),
+        "ymax": np.max(shaps_age.values),
+        "xmin": np.nanmin(shaps_age.data),
+        "xmax": np.nanmax(shaps_age.data),
+    }
+
+    reload(extra_funcs)
+    fig_age = extra_funcs.plot_shap_hb(
+        shaps_age,
+        shaps_hb,
+        limits,
+        xpos_text=0.4,
+        num_digigts=2,
+        do_fix_colorbar_shape=False,
+        variable="Age",
+    )
+    filename = f"./figures/shap_interation__outcome_A__ML__age.pdf"
+    fig_age.savefig(filename, dpi=300, bbox_inches="tight")
+
+    shaps_age_women = extra_funcs.get_masked_version(shaps_age, mask_women)
+    shaps_age_men = extra_funcs.get_masked_version(shaps_age, mask_men)
+    shaps_hb_women = extra_funcs.get_masked_version(shaps_hb, mask_women)
+    shaps_hb_men = extra_funcs.get_masked_version(shaps_hb, mask_men)
+
+    reload(extra_funcs)
+    fig_age_gender = extra_funcs.plot_shap_hb_2_split(
+        shaps_age,
+        shaps_age_women,
+        shaps_age_men,
+        shaps_hb_women,
+        shaps_hb_men,
+        limits,
+        "Women",
+        "Men",
+        xpos_text=0.4,
+        num_digigts=2,
+        do_fix_colorbar_shape=False,
+        variable="Age",
+    )
+
+    filename = f"./figures/shap_interation__outcome_A__ML__age__gender.pdf"
+    fig_age_gender.savefig(filename, dpi=300, bbox_inches="tight")
+
+    shaps_age_hip = extra_funcs.get_masked_version(shaps_age, mask_hip)
+    shaps_age_knee = extra_funcs.get_masked_version(shaps_age, mask_knee)
+    shaps_hb_hip = extra_funcs.get_masked_version(shaps_hb, mask_hip)
+    shaps_hb_knee = extra_funcs.get_masked_version(shaps_hb, mask_knee)
+
+    fig_age_hip_knee = extra_funcs.plot_shap_hb_2_split(
+        shaps_age,
+        shaps_age_hip,
+        shaps_age_knee,
+        shaps_hb_hip,
+        shaps_hb_knee,
+        limits,
+        "Hip",
+        "Knee",
+        xpos_text=0.4,
+        num_digigts=2,
+        do_fix_colorbar_shape=False,
+        variable="Age",
+    )
+    filename = f"./figures/shap_interation__outcome_A__ML__age__hip-knee.pdf"
+    fig_age_hip_knee.savefig(filename, dpi=300, bbox_inches="tight")
+
+# %%

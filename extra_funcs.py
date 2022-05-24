@@ -2891,7 +2891,16 @@ def compute_y0_std(logistic_params, covariance):
     return np.std(y0s)
 
 
-def plot_logistic(ax, logistic_params, covariance, limits, ypos_text=0.85):
+def plot_logistic(
+    ax,
+    logistic_params,
+    covariance,
+    limits,
+    xpos_text=0.99,
+    ypos_text=0.85,
+    num_digigts=4,
+    variable="hb",
+):
     xx = np.linspace(limits["xmin"], limits["xmax"], 1000)
     yy = logistic_curve(xx, *logistic_params)
     ax.plot(xx, yy, ls="-", c="k")
@@ -2899,10 +2908,10 @@ def plot_logistic(ax, logistic_params, covariance, limits, ypos_text=0.85):
     y0 = compute_y0(logistic_params)
     y0_std = compute_y0_std(logistic_params, covariance)
 
-    s = f"SHAP = 0 => \nhb = {y0:.4f} +/- {y0_std:.4f}"
+    s = f"SHAP = 0 => \n{variable} = {y0:.{num_digigts}f} +/- {y0_std:.{num_digigts}f}"
 
     ax.text(
-        0.99,
+        xpos_text,
         ypos_text,
         s,
         horizontalalignment="right",
@@ -2919,12 +2928,30 @@ def fix_colorbar_shap(ax, alpha=0.5):
     cb.ax.set_aspect(1)
 
 
-def plot_shap_hb(shaps_hb, shaps_age, limits):
+def plot_shap_hb(
+    shaps_hb,
+    shaps_age,
+    limits,
+    xpos_text=0.99,
+    ypos_text=0.99,
+    num_digigts=4,
+    do_fix_colorbar_shape=True,
+    variable="hb"
+):
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
     logistic_params, covariance = fit_logistic(shaps_hb)
-    plot_logistic(ax, logistic_params, covariance, limits, ypos_text=0.99)
+    plot_logistic(
+        ax,
+        logistic_params,
+        covariance,
+        limits,
+        xpos_text=xpos_text,
+        ypos_text=ypos_text,
+        num_digigts=num_digigts,
+        variable=variable,
+    )
 
     ax.axhline(y=0, ls="--", c="k", alpha=0.5)
 
@@ -2939,7 +2966,8 @@ def plot_shap_hb(shaps_hb, shaps_age, limits):
     )
     plt.close("all")
 
-    fix_colorbar_shap(ax)
+    if do_fix_colorbar_shape:
+        fix_colorbar_shap(ax)
 
     return fig
 
@@ -2953,12 +2981,27 @@ def plot_shap_hb_2_split(
     limits,
     name1,
     name2,
+    xpos_text=0.99,
+    ypos_text=0.99,
+    num_digigts=4,
+    do_fix_colorbar_shape=True,
+    variable="hb"
 ):
+
 
     fig, (ax1, ax2) = plt.subplots(figsize=(10, 10), nrows=2, sharex=True)
 
     logistic_params_1, covariance_1 = fit_logistic(shaps_hb_mask1)
-    plot_logistic(ax1, logistic_params_1, covariance_1, limits)
+    plot_logistic(
+        ax1,
+        logistic_params_1,
+        covariance_1,
+        limits,
+        xpos_text=xpos_text,
+        ypos_text=ypos_text,
+        num_digigts=num_digigts,
+        variable=variable,
+    )
 
     ax1.axhline(y=0, ls="--", c="k", alpha=0.5)
     ax1.text(
@@ -2979,12 +3022,22 @@ def plot_shap_hb_2_split(
         color=shaps_age_mask1,
         **limits,
     )
-    fix_colorbar_shap(ax1)
+    if do_fix_colorbar_shape:
+        fix_colorbar_shap(ax1)
 
     plt.close("all")
 
     logistic_params_2, covariance_2 = fit_logistic(shaps_hb_mask2)
-    plot_logistic(ax2, logistic_params_2, covariance_2, limits)
+    plot_logistic(
+        ax2,
+        logistic_params_2,
+        covariance_2,
+        limits,
+        xpos_text=xpos_text,
+        ypos_text=ypos_text,
+        num_digigts=num_digigts,
+        variable=variable,
+    )
 
     ax2.axhline(y=0, ls="--", c="k", alpha=0.5)
     ax2.text(
@@ -3005,6 +3058,7 @@ def plot_shap_hb_2_split(
         **limits,
     )
 
-    fix_colorbar_shap(ax2)
+    if do_fix_colorbar_shape:
+        fix_colorbar_shap(ax2)
 
     return fig
