@@ -2973,7 +2973,6 @@ def plot_shap_hb(
 
 
 def plot_shap_hb_2_split(
-    shaps_hb,
     shaps_hb_mask1,
     shaps_hb_mask2,
     shaps_age_mask1,

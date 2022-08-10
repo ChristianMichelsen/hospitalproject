@@ -6,16 +6,16 @@ authors = ["Christian Michelsen <christianmichelsen@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
-pandas = "^1.4.2"
-scipy = "^1.8.0"
+pandas = "^1.4.3"
+scipy = "^1.9.0"
 seaborn = "^0.11.2"
 lightgbm = "^3.3.2"
-scikit-learn = "^1.0.2"
+scikit-learn = "^1.1.2"
 llvmlite = "^0.38.0"
 numba = "^0.55.1"
-shap = "^0.40.0"
-optuna = "^2.10.0"
-pyprg = "^0.1.1-beta.7"
+shap = "^0.41.0"
+optuna = "^2.10.1"
+pyprg = "^0.1.1b7"
 matplotlib = "^3.5.2"
 
 [tool.poetry.group.dev.dependencies]

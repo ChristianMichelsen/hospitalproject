@@ -122,8 +122,6 @@ else:
         for k in dict_variables:
             dicts[k] = defaultdict()
 
-        #%%
-
         df_table = extra_funcs.get_table_df(y_label)
         if save_stuff:
             filename_table = f"./results/table__{y_label}.csv"
@@ -158,8 +156,6 @@ else:
             exclude="age",
             PPF_cut=PPF,
         )
-
-        #%%
 
         extra_funcs.add_ML_model(
             cfg=cfg,
@@ -196,8 +192,6 @@ else:
                 include=cols_26_ordered,
                 PPF_cut=PPF,
             )
-
-        #%%
 
         shap_ordered_columns = extra_funcs.get_shap_ordered_columns(
             dicts=dicts,
@@ -463,7 +457,7 @@ if False:
 #%%
 
 
-if False:
+if True:
 
     from copy import deepcopy
 
@@ -497,8 +491,8 @@ if False:
     shaps_hb_men = extra_funcs.get_masked_version(shaps_hb, mask_men)
     shaps_age_women = extra_funcs.get_masked_version(shaps_age, mask_women)
     shaps_age_men = extra_funcs.get_masked_version(shaps_age, mask_men)
+
     fig_hb_gender = extra_funcs.plot_shap_hb_2_split(
-        shaps_hb,
         shaps_hb_women,
         shaps_hb_men,
         shaps_age_women,
@@ -506,6 +500,7 @@ if False:
         limits,
         "Women",
         "Men",
+        ypos_text=0.85,
     )
 
     filename = f"./figures/shap_interation__outcome_A__ML__hb__gender.pdf"
@@ -517,7 +512,6 @@ if False:
     shaps_age_knee = extra_funcs.get_masked_version(shaps_age, mask_knee)
 
     fig_hb_hip_knee = extra_funcs.plot_shap_hb_2_split(
-        shaps_hb,
         shaps_hb_hip,
         shaps_hb_knee,
         shaps_age_hip,
@@ -525,14 +519,58 @@ if False:
         limits,
         "Hip",
         "Knee",
+        ypos_text=0.85,
     )
     filename = f"./figures/shap_interation__outcome_A__ML__hb__hip-knee.pdf"
     fig_hb_hip_knee.savefig(filename, dpi=300, bbox_inches="tight")
 
+    shaps_hb_women_hip = extra_funcs.get_masked_version(shaps_hb, mask_women & mask_hip)
+    shaps_hb_men_hip = extra_funcs.get_masked_version(shaps_hb, mask_men & mask_hip)
+    shaps_age_women_hip = extra_funcs.get_masked_version(
+        shaps_age, mask_women & mask_hip
+    )
+    shaps_age_men_hip = extra_funcs.get_masked_version(shaps_age, mask_men & mask_hip)
+
+    fig_hb_gender_hip = extra_funcs.plot_shap_hb_2_split(
+        shaps_hb_women_hip,
+        shaps_hb_men_hip,
+        shaps_age_women_hip,
+        shaps_age_men_hip,
+        limits,
+        "Women, hip",
+        "Men, hip",
+        ypos_text=0.85,
+    )
+
+    filename = f"./figures/shap_interation__outcome_A__ML__hb__gender__hip.pdf"
+    fig_hb_gender_hip.savefig(filename, dpi=300, bbox_inches="tight")
+
+    shaps_hb_women_knee = extra_funcs.get_masked_version(
+        shaps_hb, mask_women & mask_knee
+    )
+    shaps_hb_men_knee = extra_funcs.get_masked_version(shaps_hb, mask_men & mask_knee)
+    shaps_age_women_knee = extra_funcs.get_masked_version(
+        shaps_age, mask_women & mask_knee
+    )
+    shaps_age_men_knee = extra_funcs.get_masked_version(shaps_age, mask_men & mask_knee)
+
+    fig_hb_gender_knee = extra_funcs.plot_shap_hb_2_split(
+        shaps_hb_women_knee,
+        shaps_hb_men_knee,
+        shaps_age_women_knee,
+        shaps_age_men_knee,
+        limits,
+        "Women, knee",
+        "Men, knee",
+        ypos_text=0.85,
+    )
+    filename = f"./figures/shap_interation__outcome_A__ML__hb__gender__knee.pdf"
+    fig_hb_gender_knee.savefig(filename, dpi=300, bbox_inches="tight")
+
 
 #%%
 
-if True:
+if False:
 
     from copy import deepcopy
 
@@ -578,7 +616,6 @@ if True:
 
     reload(extra_funcs)
     fig_age_gender = extra_funcs.plot_shap_hb_2_split(
-        shaps_age,
         shaps_age_women,
         shaps_age_men,
         shaps_hb_women,
@@ -601,7 +638,6 @@ if True:
     shaps_hb_knee = extra_funcs.get_masked_version(shaps_hb, mask_knee)
 
     fig_age_hip_knee = extra_funcs.plot_shap_hb_2_split(
-        shaps_age,
         shaps_age_hip,
         shaps_age_knee,
         shaps_hb_hip,
