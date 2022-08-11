@@ -1,1 +1,3 @@
 # hospitalproject
+
+python main.py
