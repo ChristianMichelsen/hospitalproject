@@ -1,4 +1,5 @@
 #%%
+
 from collections import defaultdict
 from importlib import reload
 from pathlib import Path
@@ -15,14 +16,14 @@ import extra_funcs
 plt.rcParams.update({"text.usetex": False})
 
 # run_all_models = False
-run_all_models = True
+# run_all_models = True
+# plot_stuff = False
 plot_stuff = False
-# plot_stuff = True
+# save_stuff = False
 save_stuff = False
-# save_stuff = True
 forced = False
 # forced = True
-add_ML_26 = True
+# add_ML_26 = True
 
 use_FL = False
 # use_FL = True
@@ -31,7 +32,7 @@ FL_str = "use_FL" if use_FL else "no_FL"
 y_label = "outcome_B"
 y_label = "outcome_A"
 y_labels = ["outcome_A", "outcome_B"]
-y_labels = ["outcome_A"]  #
+# y_labels = ["outcome_A"]  #
 
 # PPF = 0.10
 # PPF = 0.15
@@ -39,8 +40,13 @@ PPF = 0.20
 # PPF = 0.25
 # PPF = 0.30
 
+do_calibration = True
+
 
 # %%
+
+
+# reload(extra_funcs)
 
 cfg = dict()
 
@@ -48,7 +54,7 @@ cfg = dict()
 if extra_funcs.is_hep():
     cfg["force_HPO"] = False
     cfg["n_trials"] = 1000
-    cfg["n_jobs"] = 30
+    cfg["n_jobs"] = 20
 else:
     cfg["force_HPO"] = False
     cfg["n_trials"] = 1000
@@ -59,7 +65,7 @@ optimize = "AUC"  # "average_precision"
 cfg["optimize"] = optimize  # "TPR", "focal_loss", "AUC", "average_precision"
 cfg["FL_str"] = FL_str
 cfg["PPF"] = PPF
-cfg["add_ML_26"] = add_ML_26
+# cfg["add_ML_26"] = add_ML_26
 
 cfg_str = extra_funcs.cfg_to_str(cfg)
 cfg_str_with_PPF = f"{cfg_str}__{PPF:.2f}"
@@ -105,6 +111,8 @@ else:
     for y_label in y_labels:
 
         # break
+        # x = x
+        # reload(extra_funcs)
 
         dict_variables = [
             "data",
@@ -116,6 +124,9 @@ else:
             "PR",
             "PRG",
             "models",
+            "models_uncalibrated",
+            "y_pred_proba_uncalibrated",
+            "y_pred_proba_train_uncalibrated",
         ]
 
         dicts = {}
@@ -135,27 +146,37 @@ else:
             key="only_age",
             PPF_cut=PPF,
         )
-        extra_funcs.add_model_risc_score1(
-            dicts=dicts,
-            y_label=y_label,
-            key="risc_score1",
-            PPF_cut=PPF,
-        )
+        # extra_funcs.add_model_risc_score1(
+        #     dicts=dicts,
+        #     y_label=y_label,
+        #     key="risc_score1",
+        #     PPF_cut=PPF,
+        # )
 
         extra_funcs.add_model_LR(
             dicts=dicts,
             y_label=y_label,
             key="LR",
             PPF_cut=PPF,
+            do_calibration=do_calibration,
         )
 
         extra_funcs.add_model_LR(
             dicts=dicts,
             y_label=y_label,
-            key="LR__exclude_age",
-            exclude="age",
+            key="LR_median",
             PPF_cut=PPF,
+            median_impute=True,
+            do_calibration=do_calibration,
         )
+
+        # extra_funcs.add_model_LR(
+        #     dicts=dicts,
+        #     y_label=y_label,
+        #     key="LR__exclude_age",
+        #     exclude="age",
+        #     PPF_cut=PPF,
+        # )
 
         extra_funcs.add_ML_model(
             cfg=cfg,
@@ -165,38 +186,40 @@ else:
             use_FL=use_FL,
             name=f"{y_label}__ML__{cfg_str}",
             PPF_cut=PPF,
+            do_calibration=do_calibration,
         )
 
-        if run_all_models:
-            extra_funcs.add_ML_model(
-                cfg=cfg,
-                dicts=dicts,
-                y_label=y_label,
-                use_FL=use_FL,
-                key="ML__exclude_age",
-                name=f"{y_label}__ML__exclude_age__{cfg_str}",
-                exclude="age",
-                PPF_cut=PPF,
-            )
+        # if run_all_models:
+        # extra_funcs.add_ML_model(
+        #     cfg=cfg,
+        #     dicts=dicts,
+        #     y_label=y_label,
+        #     use_FL=use_FL,
+        #     key="ML__exclude_age",
+        #     name=f"{y_label}__ML__exclude_age__{cfg_str}",
+        #     exclude="age",
+        #     PPF_cut=PPF,
+        # )
 
-        if add_ML_26:
-            cols_26_ordered = extra_funcs.load_cols_26(y_label)
-            extra_funcs.add_ML_model(
-                cfg=cfg,
-                dicts=dicts,
-                y_label=y_label,
-                key=f"ML__26",
-                use_FL=use_FL,
-                # name=f"{y_label}__ML__{cfg_str}",
-                name=f"{y_label}__ML__26__{cfg_str}",
-                include=cols_26_ordered,
-                PPF_cut=PPF,
-            )
+        # if add_ML_26:
+        #     cols_26_ordered = extra_funcs.load_cols_26(y_label)
+        #     extra_funcs.add_ML_model(
+        #         cfg=cfg,
+        #         dicts=dicts,
+        #         y_label=y_label,
+        #         key=f"ML__26",
+        #         use_FL=use_FL,
+        #         # name=f"{y_label}__ML__{cfg_str}",
+        #         name=f"{y_label}__ML__26__{cfg_str}",
+        #         include=cols_26_ordered,
+        #         PPF_cut=PPF,
+        #     )
 
         shap_ordered_columns = extra_funcs.get_shap_ordered_columns(
             dicts=dicts,
             use_FL=use_FL,
             key="ML",
+            do_calibration=do_calibration,
         )
 
         extra_funcs.add_ML_model(
@@ -208,6 +231,7 @@ else:
             name=f"{y_label}__ML__top_10__{cfg_str}",
             include=list(shap_ordered_columns.index[:10]),
             PPF_cut=PPF,
+            do_calibration=do_calibration,
         )
 
         extra_funcs.add_model_LR(
@@ -216,6 +240,7 @@ else:
             key="LR__top_10",
             include=list(shap_ordered_columns.index[:10]),
             PPF_cut=PPF,
+            do_calibration=do_calibration,
         )
 
         data_ROC[y_label] = extra_funcs.extract_data_ROC(dicts)
@@ -223,6 +248,7 @@ else:
             dicts=dicts,
             use_FL=use_FL,
             use_test=False,
+            do_calibration=do_calibration,
         )
         data_df[y_label] = extra_funcs.extract_data_df(dicts)
         data_all = extra_funcs.extract_all_data_df(dicts)
@@ -255,6 +281,7 @@ print("\n\n\n")
 
 #%%
 
+
 if plot_stuff:
 
     print("plotting stuff")
@@ -264,10 +291,21 @@ if plot_stuff:
         data_risc_scores,
         data_ROC,
         cfg_str_with_PPF,
-        include_ML__exclude_age=True,
         cuts=[(PPF - 0.05, PPF + 0.05)],
-        add_ML_26=add_ML_26,
+        plot_test=True,
+        # include_ML__exclude_age=True,
+        # add_ML_26=add_ML_26,
     )
+
+    # extra_funcs.make_ROC_curves(
+    #     data_risc_scores,
+    #     data_ROC,
+    #     cfg_str_with_PPF,
+    #     cuts=[(PPF - 0.05, PPF + 0.05)],
+    #     plot_test=False,
+    #     # include_ML__exclude_age=True,
+    #     # add_ML_26=add_ML_26,
+    # )
 
     extra_funcs.make_shap_plots(
         data_shap,
@@ -321,8 +359,64 @@ print("\n\n\nfinished")
 
 #%%
 
+x = x
+
 
 # %%
+from sklearn.calibration import calibration_curve
+from sklearn.metrics import brier_score_loss
+
+key = "ML"
+
+y_test = dicts["data"][key]["y_test"]
+
+y_pred_proba_calibrated = dicts["y_pred_proba"][key]
+
+
+prob_true_calibrated, prob_pred_calibrated = calibration_curve(
+    y_test,
+    y_pred_proba_calibrated,
+    n_bins=20,
+)
+
+
+print(brier_score_loss(y_test, y_pred_proba_calibrated))
+
+
+y_pred_proba_uncalibrated = dicts["y_pred_proba_uncalibrated"][key]
+
+prob_true_uncalibrated, prob_pred_uncalibrated = calibration_curve(
+    y_test,
+    y_pred_proba_uncalibrated,
+    n_bins=20,
+)
+print(brier_score_loss(y_test, y_pred_proba_uncalibrated))
+
+
+#%%
+
+fig, ax = plt.subplots(figsize=(10, 6))
+
+ax.plot([0, 1], [0, 1], linestyle="-")
+
+ax.plot(
+    prob_pred_uncalibrated,
+    prob_true_uncalibrated,
+    marker=".",
+    label="uncalibrated",
+)
+
+if do_calibration:
+    ax.plot(
+        prob_pred_calibrated,
+        prob_true_calibrated,
+        marker=".",
+        label="calibrated",
+    )
+ax.set(xlabel="Mean predicted probability", ylabel="Fraction of positives")
+ax.legend()
+
+#%%
 
 
 if False:
@@ -409,6 +503,55 @@ if False:
             fig.savefig(filename, dpi=300, bbox_inches="tight")
             fig.savefig(filename_png, dpi=300, bbox_inches="tight")
 
+
+#%%
+
+
+if False:
+
+    d_risc_scores = data_risc_scores["outcome_A"]["ML"]
+    cutoff = d_risc_scores["cutoff"]
+    y_pred_proba = dicts["y_pred_proba"]["ML"]
+    y_test = dicts["y_test"]["ML"]
+
+    y_test.sum()
+
+    (y_pred_proba > cutoff).sum()
+    (y_pred_proba > 0.5).sum()
+    (y_pred_proba > 0.6).sum()
+
+    from sklearn.metrics import brier_score_loss
+
+    brier_score_loss(y_test, y_pred_proba)
+    brier_score_loss(y_test, y_pred_proba > cutoff)
+
+    from sklearn.calibration import calibration_curve
+
+    prob_true, prob_pred = calibration_curve(y_test, y_pred_proba, n_bins=5)
+
+    # plot perfectly calibrated
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.plot([0, 1], [0, 1], linestyle="--")
+    ax.plot(prob_pred, prob_true, marker=".")
+    ax.set(xlabel="Mean predicted probability", ylabel="Fraction of positives")
+
+    cutoff_LR = dicts["results"]["LR"]["cutoff"]
+    y_pred_proba_LR = dicts["y_pred_proba"]["LR"]
+    y_test = dicts["data"]["LR"]["y_test"]
+
+    brier_score_loss(y_test, y_pred_proba_LR)
+
+    prob_true_LR, prob_pred_LR = calibration_curve(y_test, y_pred_proba_LR, n_bins=10)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.plot([0, 1], [0, 1], linestyle="--")
+    ax.plot(prob_pred_LR, prob_true_LR, marker=".")
+    ax.set(xlabel="Mean predicted probability", ylabel="Fraction of positives")
+
+
 #%%
 
 if False:
@@ -457,7 +600,7 @@ if False:
 #%%
 
 
-if True:
+if False:
 
     from copy import deepcopy
 

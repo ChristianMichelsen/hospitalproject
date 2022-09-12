@@ -1,3 +1,5 @@
+#%%
+
 import os
 import platform
 from copy import copy
@@ -14,11 +16,14 @@ import shap
 from optuna.integration import LightGBMPruningCallback
 from optuna.pruners import MedianPruner
 from optuna.samplers import TPESampler
-from sklearn.impute import SimpleImputer
+from sklearn import linear_model
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer, SimpleImputer
 from sklearn.metrics import (
     accuracy_score,
     auc,
     average_precision_score,
+    brier_score_loss,
     classification_report,
     cohen_kappa_score,
     confusion_matrix,
@@ -326,29 +331,10 @@ def get_data(
 
     cv_splits_validation = get_train_test_splits(df_train_val, time_intervals_val)
 
-    X_train_val_imputed, imputer = impute(X_train_val)
-    X_test_imputed, _ = impute(X_test, imputer=imputer)
-
-    scaler = StandardScaler()
-    X_train_val_imputed_scaled = scaler.fit_transform(X_train_val_imputed)
-    X_train_val_imputed_scaled = pd.DataFrame(
-        X_train_val_imputed_scaled,
-        columns=X_train_val_imputed.columns,
-        index=X_train_val_imputed.index,
-    )
-    X_test_imputed_scaled = scaler.transform(X_test_imputed)
-    X_test_imputed_scaled = pd.DataFrame(
-        X_test_imputed_scaled,
-        columns=X_test_imputed.columns,
-        index=X_test_imputed.index,
-    )
-
     d_data = {}
     d_data["X"] = X
     d_data["X_train_val"] = X_train_val
-    d_data["X_train_val_imputed"] = X_train_val_imputed
     d_data["X_test"] = X_test
-    d_data["X_test_imputed"] = X_test_imputed
 
     d_data["y"] = y
     d_data["y_train_val"] = y_train_val
@@ -362,11 +348,82 @@ def get_data(
     d_data["columns_cat_subset"] = columns_cat_subset
 
     d_data["cv_splits_validation"] = cv_splits_validation
-    d_data["imputer"] = imputer
 
+    # Define MICE Imputer and fill missing values
+    mice_imputer = IterativeImputer(
+        estimator=linear_model.BayesianRidge(),
+        n_nearest_features=None,
+        imputation_order="ascending",
+    )
+
+    X_train_val_imputed = pd.DataFrame(
+        mice_imputer.fit_transform(X_train_val),
+        columns=X_train_val.columns,
+    )
+
+    X_test_imputed = pd.DataFrame(
+        mice_imputer.transform(X_test),
+        columns=X_test.columns,
+    )
+
+    cols_to_scale = [col for col in numerical_columns if col in X.columns]
+
+    scaler = StandardScaler()
+    X_train_val_imputed_scaled_np = scaler.fit_transform(
+        X_train_val_imputed[cols_to_scale]
+    )
+    X_train_val_imputed_scaled = X_train_val_imputed.copy()
+    for i, col in enumerate(cols_to_scale):
+        X_train_val_imputed_scaled.loc[:, col] = X_train_val_imputed_scaled_np[:, i]
+
+    X_test_imputed_scaled_np = scaler.transform(X_test_imputed[cols_to_scale])
+    X_test_imputed_scaled = X_test_imputed.copy()
+    for i, col in enumerate(cols_to_scale):
+        X_test_imputed_scaled.loc[:, col] = X_test_imputed_scaled_np[:, i]
+
+    d_data["imputer"] = mice_imputer
+    d_data["X_train_val_imputed"] = X_train_val_imputed
+    d_data["X_test_imputed"] = X_test_imputed
+
+    d_data["scaler"] = scaler
     d_data["X_train_val_imputed_scaled"] = X_train_val_imputed_scaled
     d_data["X_test_imputed_scaled"] = X_test_imputed_scaled
-    d_data["scaler"] = scaler
+
+    # Define median Imputer and fill missing values
+    median_imputer = SimpleImputer(strategy="median")
+
+    X_train_val_median_imputed = pd.DataFrame(
+        median_imputer.fit_transform(X_train_val),
+        columns=X_train_val.columns,
+    )
+
+    X_test_median_imputed = pd.DataFrame(
+        median_imputer.transform(X_test),
+        columns=X_test.columns,
+    )
+
+    X_train_val_median_imputed_scaled_np = scaler.transform(
+        X_train_val_median_imputed[cols_to_scale]
+    )
+    X_train_val_median_imputed_scaled = X_train_val_median_imputed.copy()
+    for i, col in enumerate(cols_to_scale):
+        X_train_val_median_imputed_scaled.loc[
+            :, col
+        ] = X_train_val_median_imputed_scaled_np[:, i]
+
+    X_test_median_imputed_scaled_np = scaler.transform(
+        X_test_median_imputed[cols_to_scale]
+    )
+    X_test_median_imputed_scaled = X_test_median_imputed.copy()
+    for i, col in enumerate(cols_to_scale):
+        X_test_median_imputed_scaled.loc[:, col] = X_test_median_imputed_scaled_np[:, i]
+
+    d_data["median_imputer"] = median_imputer
+    d_data["X_train_val_median_imputed"] = X_train_val_median_imputed
+    d_data["X_test_median_imputed"] = X_test_median_imputed
+
+    d_data["X_train_val_median_imputed_scaled"] = X_train_val_median_imputed_scaled
+    d_data["X_test_median_imputed_scaled"] = X_test_median_imputed_scaled
 
     return d_data
 
@@ -594,6 +651,8 @@ def extract_data_risc_scores(dicts):
             "y_test": dicts["data"][key]["y_test"],
             "y_pred_proba": dicts["y_pred_proba"][key],
             "cutoff": dicts["results"][key]["cutoff"],
+            "y_train": dicts["data"][key]["y_train_val"],
+            "y_pred_proba_train": dicts["y_pred_proba_train"][key],
         }
     return d_risc_scores
 
@@ -740,6 +799,7 @@ def nb_compute_cutoff_PPF_TPR(
         y_pred = y_pred_proba >= cutoff
         d_cm = compute_confusion_matrix(y_true, y_pred)
         PPF = compute_PPF(d_cm)
+        PPF
         if PPF < PPF_cut:
             TPR = compute_TPR(d_cm)
             # break
@@ -894,6 +954,7 @@ def compute_performance_measures(dicts, key, PPF_cut, cutoff=None):
     d_out["PR_AUC"] = average_precision_score(y_true[mask], y_pred_proba[mask])
     d_out["PRG_AUC"] = compute_PRG_AUC(y_true[mask], y_pred_proba[mask])
     d_out["cutoff"] = cutoff
+    d_out["brier_score"] = brier_score_loss(y_true[mask], y_pred_proba[mask])
 
     dicts["results"][key] = d_out
 
@@ -928,13 +989,17 @@ from sklearn.preprocessing import MinMaxScaler
 def add_model_age_only(dicts, y_label, key, PPF_cut):
 
     d_data = get_data(y_label)
-    X_test = d_data["X_test"]
     dicts["data"][key] = d_data
 
     scaler = MinMaxScaler()
 
-    X_test_np = X_test["age"].values.reshape(-1, 1)
-    dicts["y_pred_proba"][key] = scaler.fit_transform(X_test_np)[:, 0]
+    X_train_np = d_data["X_train_val"]["age"].values.reshape(-1, 1)
+    X_test_np = d_data["X_test"]["age"].values.reshape(-1, 1)
+
+    scaler.fit(X_train_np)
+
+    dicts["y_pred_proba"][key] = scaler.transform(X_test_np)[:, 0]
+    dicts["y_pred_proba_train"][key] = scaler.transform(X_train_np)[:, 0]
 
     compute_performance_measures(dicts, key, PPF_cut=PPF_cut)
 
@@ -954,27 +1019,65 @@ def add_model_risc_score1(dicts, y_label, key, PPF_cut):
 
 #%%
 
+# import statsmodels.api as sm
 from sklearn import preprocessing
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
 
 
-def add_model_LR(dicts, y_label, key, PPF_cut, exclude=None, include=None):
+def add_model_LR(
+    dicts,
+    y_label,
+    key,
+    PPF_cut,
+    exclude=None,
+    include=None,
+    median_impute=False,
+    do_calibration=True,
+):
 
     d_data = get_data(y_label, exclude=exclude, include=include)
     dicts["data"][key] = d_data
 
-    clf = LogisticRegression(random_state=0, max_iter=10_000).fit(
-        d_data["X_train_val_imputed_scaled"], d_data["y_train_val"]
+    if median_impute:
+        X_train = d_data["X_train_val_median_imputed_scaled"]
+        X_test = d_data["X_test_median_imputed_scaled"]
+    else:
+        X_train = d_data["X_train_val_imputed_scaled"]
+        X_test = d_data["X_test_imputed_scaled"]
+
+    clf = LogisticRegression(
+        random_state=0,
+        max_iter=10_000,
+        class_weight="balanced",
+    ).fit(
+        X_train,
+        d_data["y_train_val"],
     )
+    clf.intercept_
+    clf.coef_
 
-    dicts["y_pred_proba"][key] = clf.predict_proba(d_data["X_test_imputed_scaled"])[
-        :, 1
-    ]
-    dicts["y_pred_proba_train"][key] = clf.predict_proba(
-        d_data["X_train_val_imputed_scaled"]
-    )[:, 1]
+    # calibrated_clf = CalibratedClassifierCV(base_estimator=clf, cv=5)
+    # calibrated_clf.fit(X_train, d_data["y_train_val"])
 
-    dicts["models"][key] = clf
+    if do_calibration:
+
+        calibrated_clf = Calibrator(clf, method=CALIBRATOR_METHOD)
+        calibrated_clf.fit(X_train, d_data["y_train_val"])
+
+        dicts["models"][key] = calibrated_clf
+        dicts["y_pred_proba"][key] = calibrated_clf.predict_proba(X_test)
+        dicts["y_pred_proba_train"][key] = calibrated_clf.predict_proba(X_train)
+
+        dicts["models_uncalibrated"][key] = clf
+        dicts["y_pred_proba_uncalibrated"][key] = clf.predict_proba(X_test)[:, 1]
+        dicts["y_pred_proba_train_uncalibrated"][key] = clf.predict_proba(X_train)[:, 1]
+
+    else:
+
+        dicts["models"][key] = clf
+        dicts["y_pred_proba"][key] = clf.predict_proba(X_test)[:, 1]
+        dicts["y_pred_proba_train"][key] = clf.predict_proba(X_train)[:, 1]
 
     compute_performance_measures(dicts, key, PPF_cut=PPF_cut)
 
@@ -1122,6 +1225,49 @@ class FLModel:
 #%%
 
 
+from sklearn.base import BaseEstimator
+from sklearn.calibration import IsotonicRegression, _SigmoidCalibration
+
+CALIBRATOR_METHOD = "sigmoid"
+
+
+class Calibrator:
+    def __init__(self, model, method="sigmoid"):
+        self.model = model
+        self.method = method
+        if method.lower() == "sigmoid":
+            self.calibrator = _SigmoidCalibration()
+        elif method.lower() == "isotonic":
+            self.calibrator = IsotonicRegression(out_of_bounds="clip")
+        else:
+            raise AssertionError("method must be 'sigmoid' or 'isotonic'")
+
+    def fit(self, X, y):
+        y_pred_proba = self.model.predict(X)
+        self.calibrator.fit(y_pred_proba, y)
+        return self
+
+    def predict_proba(self, X):
+        y_pred_proba_uncalibrated = self.predict_proba_uncalibrated(X)
+        y_pred_proba_calibrated = self.calibrator.predict(y_pred_proba_uncalibrated)
+        return y_pred_proba_calibrated
+
+    def predict(self, X, cutoff=0.5):
+        y_pred_proba_calibrated = self.predict_proba(X)
+        y_pred = y_pred_proba_calibrated > cutoff
+        return y_pred
+
+    def predict_proba_uncalibrated(self, X):
+        # if scikit-learn model
+        if isinstance(self.model, BaseEstimator):
+            return self.model.predict_proba(X)[:, 1]
+        else:
+            return self.model.predict(X)
+
+
+#%%
+
+
 def add_ML_model(
     cfg,
     dicts,
@@ -1135,6 +1281,7 @@ def add_ML_model(
     df=None,
     X=None,
     y=None,
+    do_calibration=True,
 ):
 
     print(f"\n\nFitting ML model {key}. \n\n")
@@ -1287,10 +1434,30 @@ def add_ML_model(
             # verbose_eval=100,
         )
 
-    dicts["y_pred_proba"][key] = model.predict(d_data["X_test"])
-    dicts["y_pred_proba_train"][key] = model.predict(d_data["X_train_val"])
+    if do_calibration:
 
-    dicts["models"][key] = model
+        calibrated_clf = Calibrator(model, method=CALIBRATOR_METHOD)
+        calibrated_clf.fit(d_data["X_train_val"], d_data["y_train_val"])
+        # calibrated_clf.predict_proba(d_data["X_test"])
+        # calibrated_clf.predict_proba(d_data["X_train_val"])
+
+        dicts["models"][key] = calibrated_clf
+        dicts["y_pred_proba"][key] = calibrated_clf.predict_proba(d_data["X_test"])
+        dicts["y_pred_proba_train"][key] = calibrated_clf.predict_proba(
+            d_data["X_train_val"]
+        )
+
+        dicts["models_uncalibrated"][key] = model
+        dicts["y_pred_proba_uncalibrated"][key] = model.predict(d_data["X_test"])
+        dicts["y_pred_proba_train_uncalibrated"][key] = model.predict(
+            d_data["X_train_val"]
+        )
+
+    else:
+
+        dicts["models"][key] = model
+        dicts["y_pred_proba"][key] = model.predict(d_data["X_test"])
+        dicts["y_pred_proba_train"][key] = model.predict(d_data["X_train_val"])
 
     compute_performance_measures(dicts, key, PPF_cut=PPF_cut)
 
@@ -1312,6 +1479,7 @@ def get_df_results(dicts):
             "F1", "MCC",
             # "RG", "PG",
             "ROC_AUC", "PR_AUC", "PRG_AUC",
+            "brier_score",
             "cutoff",
         ]
     # fmt:on
@@ -1377,13 +1545,12 @@ def style_df_results(df):
 
     return df_style
 
-    #%%
+
+#%%
 
 
 def extract_data_ROC(dicts):
-
-    data_ROC = {}
-
+    data_ROC = dict()
     for key in dicts["results"].keys():
 
         data_ROC[key] = {}
@@ -1588,10 +1755,15 @@ def plot_ROC(
     )
 
 
-def plot_risc_score(ax, d_risc_scores, risc_key):
+def plot_risc_score(ax, d_risc_scores, risc_key, plot_test=True):
 
-    y_pred_proba = d_risc_scores[risc_key]["y_pred_proba"]
-    y_test = d_risc_scores[risc_key]["y_test"]
+    if plot_test:
+        y_pred_proba = d_risc_scores[risc_key]["y_pred_proba"]
+        y_test = d_risc_scores[risc_key]["y_test"]
+    else:
+        y_pred_proba = d_risc_scores[risc_key]["y_pred_proba_train"]
+        y_test = d_risc_scores[risc_key]["y_train"]
+
     cutoff = d_risc_scores[risc_key]["cutoff"]
 
     xlim = (y_pred_proba.min(), y_pred_proba.max())
@@ -1625,8 +1797,9 @@ def make_risc_ROC_curve(
     d_ROC,
     PPF_cut_min,
     PPF_cut_max,
-    include_ML__exclude_age=False,
-    add_ML_26=False,
+    # include_ML__exclude_age=False,
+    # add_ML_26=False,
+    plot_test=True,
 ):
 
     keys = [
@@ -1634,7 +1807,7 @@ def make_risc_ROC_curve(
         "LR",
         "ML__top_10",
         "LR__top_10",
-        "ML__exclude_age",
+        # "ML__exclude_age",
         "only_age",
     ]
 
@@ -1643,8 +1816,8 @@ def make_risc_ROC_curve(
         r"$\mathrm{LR33}$",
         r"$\mathrm{ML10}$",
         r"$\mathrm{LR10}$",
-        r"$\mathrm{ML}$-$\mathrm{NoAge}$",
-        r"$\mathrm{Age}$",
+        # r"$\mathrm{ML}$-$\mathrm{NoAge}$",
+        r"$\mathrm{Age}$-$\mathrm{only}$",
     ]
 
     markers = [
@@ -1652,26 +1825,26 @@ def make_risc_ROC_curve(
         "o",
         "s",
         "o",
-        "s",
+        # "s",
         "^",
     ]
 
-    if not include_ML__exclude_age:
-        keys.remove("ML__exclude_age")
-        names.remove(r"$\mathrm{ML-NoAge}$")
+    # if not include_ML__exclude_age:
+    #     keys.remove("ML__exclude_age")
+    #     names.remove(r"$\mathrm{ML-NoAge}$")
 
-        markers = [
-            "s",
-            "o",
-            "s",
-            "o",
-            "^",
-        ]
+    #     markers = [
+    #         "s",
+    #         "o",
+    #         "s",
+    #         "o",
+    #         "^",
+    #     ]
 
-    if add_ML_26:
-        keys.append("ML__26")
-        names.append(r"$\mathrm{ML26}$")
-        markers.append("s")
+    # if add_ML_26:
+    #     keys.append("ML__26")
+    #     names.append(r"$\mathrm{ML26}$")
+    #     markers.append("s")
 
     # colors = ["#377eb8", "#e41a1c", "#84BDEB", "#f5abc9", "#048b00"]
     colors = [
@@ -1680,15 +1853,15 @@ def make_risc_ROC_curve(
         "#0EBFC2",
         "#FF8D30",
         "#048B00",
-        "#3EC106",
-        "#A65628",
+        # "#3EC106",
+        # "#A65628",
     ]
 
     fig, axes = plt.subplots(figsize=(15, 6), ncols=2, nrows=1)
     ax_risc, ax_ROC = axes
 
     risc_key = "ML"
-    plot_risc_score(ax_risc, d_risc_scores, risc_key)
+    plot_risc_score(ax_risc, d_risc_scores, risc_key, plot_test=plot_test)
     plot_ROC(
         fig,
         ax_ROC,
@@ -1708,9 +1881,10 @@ def make_ROC_curves(
     data_risc_scores,
     data_ROC,
     cfg_str,
-    include_ML__exclude_age=False,
+    # include_ML__exclude_age=False,
     cuts=None,
-    add_ML_26=False,
+    plot_test=True,
+    # add_ML_26=False,
 ):
 
     # PPF_cut_min, PPF_cut_max = 0.125, 0.275
@@ -1733,11 +1907,14 @@ def make_ROC_curves(
                 d_ROC,
                 PPF_cut_min=PPF_cut_min,
                 PPF_cut_max=PPF_cut_max,
-                include_ML__exclude_age=include_ML__exclude_age,
-                add_ML_26=add_ML_26,
+                plot_test=plot_test,
+                # include_ML__exclude_age=include_ML__exclude_age,
+                # add_ML_26=add_ML_26,
             )
 
             figname = f"./figures/ROC__{y_label}__{cfg_str}__{PPF_cut_min:.3f}__{PPF_cut_max:.3f}.pdf"
+            if not plot_test:
+                figname = figname.replace(".pdf", "_train.pdf")
             Path(figname).parent.mkdir(parents=True, exist_ok=True)
 
             figname_png = figname.replace(".pdf", ".png").replace("/ROC", "/pngs/ROC")
@@ -1752,13 +1929,13 @@ def make_ROC_curves(
 #%%
 
 
-def get_shap_ordered_columns(dicts, use_FL, key="ML"):
+def get_shap_ordered_columns(dicts, use_FL, key="ML", do_calibration=True):
 
-    key = "ML"
+    # key = "ML"
     model = dicts["models"][key]
     X_test = dicts["data"][key]["X_test"]
     # explainer = shap.TreeExplainer(model.model if use_FL else model) # Explainer
-    explainer = shap.Explainer(model.model if use_FL else model)
+    explainer = shap.Explainer(model.model if do_calibration else model)
     shap_values = explainer(X_test)
 
     if len(shap_values.values.shape) == 3:
@@ -1778,7 +1955,7 @@ def get_shap_ordered_columns(dicts, use_FL, key="ML"):
     return shap_ordered_columns
 
 
-def get_ML_LR_shap_values(dicts, key, use_FL, use_test=False):
+def get_ML_LR_shap_values(dicts, key, use_FL, use_test=False, do_calibration=True):
 
     model = dicts["models"][key]
 
@@ -1790,7 +1967,8 @@ def get_ML_LR_shap_values(dicts, key, use_FL, use_test=False):
         else:
             X = X_train
         # explainer = shap.TreeExplainer(model.model if use_FL else model)
-        explainer = shap.Explainer(model.model if use_FL else model)
+        # explainer = shap.Explainer(model.model if use_FL else model)
+        explainer = shap.Explainer(model.model if do_calibration else model)
 
     elif "LR" in key:
         X_test_imputed_scaled = dicts["data"][key]["X_test_imputed_scaled"]
@@ -1799,7 +1977,8 @@ def get_ML_LR_shap_values(dicts, key, use_FL, use_test=False):
             X = X_test_imputed_scaled
         else:
             X = X_train_val_imputed_scaled
-        explainer = shap.LinearExplainer(model, X)
+        # explainer = shap.LinearExplainer(model.base_estimator, X)
+        explainer = shap.LinearExplainer(model.model if do_calibration else model, X)
 
     shap_values = explainer(X)
 
@@ -1809,10 +1988,24 @@ def get_ML_LR_shap_values(dicts, key, use_FL, use_test=False):
     return shap_values
 
 
-def get_df_shap_top10(dicts, keys=("ML", "LR"), use_FL=False, use_test=False):
+def get_df_shap_top10(
+    dicts, keys=("ML", "LR"), use_FL=False, use_test=False, do_calibration=True
+):
 
-    shap_values_ML = get_ML_LR_shap_values(dicts, keys[0], use_FL, use_test=use_test)
-    shap_values_LR = get_ML_LR_shap_values(dicts, keys[1], use_FL, use_test=use_test)
+    shap_values_ML = get_ML_LR_shap_values(
+        dicts,
+        keys[0],
+        use_FL,
+        use_test=use_test,
+        do_calibration=do_calibration,
+    )
+    shap_values_LR = get_ML_LR_shap_values(
+        dicts,
+        keys[1],
+        use_FL,
+        use_test=use_test,
+        do_calibration=do_calibration,
+    )
 
     data_ML = shap_values_ML.abs.mean(axis=0).values
 
@@ -1861,12 +2054,14 @@ def extract_data_shap(
     dicts,
     use_FL=False,
     use_test=False,
+    do_calibration=True,
 ):
     df_shap_top10, shap_values_ML, shap_values_LR = get_df_shap_top10(
         dicts,
         keys=("ML", "LR"),
         use_FL=use_FL,
         use_test=use_test,
+        do_calibration=do_calibration,
     )
     data_shap = {
         "top10": df_shap_top10,
@@ -1879,6 +2074,7 @@ def extract_data_shap(
         keys=("ML__top_10", "LR__top_10"),
         use_FL=use_FL,
         use_test=use_test,
+        do_calibration=do_calibration,
     )
     data_shap["top10__top_10"] = shap_models_top10[0]
     data_shap["ML__top_10"] = shap_models_top10[1]
@@ -2030,6 +2226,8 @@ def make_shap_plots(
 
         method = "ML"
         shap_values = d_shap[method]
+
+        # shap.plots.beeswarm(shap_values)
         beeswarm(
             shap_values,
             max_display=11,
@@ -2052,7 +2250,7 @@ def make_shap_plots(
 
 
 from shap import Explanation
-from shap.plots import colors
+from shap.plots import colors as shap_colors
 from shap.plots._labels import labels
 from shap.plots._utils import convert_color, convert_ordering
 from shap.utils import safe_isinstance
@@ -2063,7 +2261,7 @@ def beeswarm(
     shap_values,
     max_display=10,
     order=Explanation.abs.mean(0),
-    color=None,
+    # color=None,
     axis_color="#333333",
     alpha=1,
     color_bar=True,
@@ -2095,7 +2293,7 @@ def beeswarm(
 
     order = convert_ordering(order, values)
 
-    color = colors.red_blue
+    color = shap_colors.red_blue
     color = convert_color(color)
 
     idx2cat = None
@@ -2152,7 +2350,7 @@ def beeswarm(
 
     row_height = 0.4
 
-    ax_was_None = True
+    ax_was_None = False
     if ax is None or fig is None:
         fig, ax = plt.subplots(
             figsize=(8, min(len(feature_order), max_display) * row_height + 1.5)
@@ -2263,15 +2461,15 @@ def beeswarm(
 
     m = cm.ScalarMappable(cmap=color)
     m.set_array([0, 1])
-    cb = plt.colorbar(m, ticks=[0, 1], aspect=1000)
+    cb = plt.colorbar(m, ticks=[0, 1], aspect=80)
     cb.set_ticklabels(["Low", "High"])
 
     cb.set_label(color_bar_label, size=18, labelpad=0)
     cb.ax.tick_params(labelsize=18, length=0)
     cb.set_alpha(1)
     cb.outline.set_visible(False)
-    bbox = cb.ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    cb.ax.set_aspect((bbox.height - 0.9) * 20)
+    # bbox = cb.ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    # cb.ax.set_aspect((bbox.height - 0.9) * 20)
     # cb.draw_all()
 
     ax.xaxis.set_ticks_position("bottom")
@@ -2456,96 +2654,96 @@ def get_shap_plot_object(shap_value, cutoff, max_display=10):
     )
 
 
-def make_local_shap_plot(ax, shap_collection_patient, fontsize=16):
+# def make_local_shap_plot(ax, shap_collection_patient, fontsize=16):
 
-    # fig, axes = plt.subplots(figsize=(18, 10), ncols=2)
-    # ax_global, ax = axes
+#     # fig, axes = plt.subplots(figsize=(18, 10), ncols=2)
+#     # ax_global, ax = axes
 
-    x = shap_collection_patient.shaps
-    y_pos = np.arange(len(x))
-    dx = shap_collection_patient.shaps_cumsum
-    names = shap_collection_patient.names
-    cutoff_logodds = shap_collection_patient.cutoff_logodds
+#     x = shap_collection_patient.shaps
+#     y_pos = np.arange(len(x))
+#     dx = shap_collection_patient.shaps_cumsum
+#     names = shap_collection_patient.names
+#     cutoff_logodds = shap_collection_patient.cutoff_logodds
 
-    # colors = px.colors.qualitative.Set1
-    blue = "#377eb8"  # colors[1]
-    red = "#e41a1c"  # colors[0]
+#     # colors = px.colors.qualitative.Set1
+#     blue = "#377eb8"  # colors[1]
+#     red = "#e41a1c"  # colors[0]
 
-    colors = [blue if xi < 0 else red for xi in x]
+#     colors = [blue if xi < 0 else red for xi in x]
 
-    ax2 = ax.twiny()
+#     ax2 = ax.twiny()
 
-    ax.barh(
-        y=y_pos,
-        width=x,
-        left=dx,
-        color=colors,
-        align="center",
-        height=1,
-    )
+#     ax.barh(
+#         y=y_pos,
+#         width=x,
+#         left=dx,
+#         color=colors,
+#         align="center",
+#         height=1,
+#     )
 
-    ax.xaxis.set_major_locator(plt.MaxNLocator(4))
+#     ax.xaxis.set_major_locator(plt.MaxNLocator(4))
 
-    xticks = ax.get_xticks()
-    ax.set(xticks=xticks)
+#     xticks = ax.get_xticks()
+#     ax.set(xticks=xticks)
 
-    xlim = ax.get_xlim()
-    ylim = (-0.75, len(x) - 0.25)
-    ax.set(
-        yticks=y_pos,
-        xlabel="Logit",
-        xlim=xlim,
-        ylim=ylim,
-    )
-    ax.set_yticklabels(names, fontsize=fontsize)
+#     xlim = ax.get_xlim()
+#     ylim = (-0.75, len(x) - 0.25)
+#     ax.set(
+#         yticks=y_pos,
+#         xlabel="Logit",
+#         xlim=xlim,
+#         ylim=ylim,
+#     )
+#     ax.set_yticklabels(names, fontsize=fontsize)
 
-    ax.xaxis.tick_top()
-    ax.xaxis.set_label_position("top")
-    ax.invert_yaxis()  # labels read top-to-bottom
+#     ax.xaxis.tick_top()
+#     ax.xaxis.set_label_position("top")
+#     ax.invert_yaxis()  # labels read top-to-bottom
 
-    ax2.xaxis.tick_bottom()
-    ax2.xaxis.set_label_position("bottom")
+#     ax2.xaxis.tick_bottom()
+#     ax2.xaxis.set_label_position("bottom")
 
-    def tick_function(X):
-        return [f"{special.expit(x):.1%}" for x in X]
+#     def tick_function(X):
+#         return [f"{special.expit(x):.1%}" for x in X]
 
-    ax2.set_xlim(xlim)
-    ax2.set_xticks(xticks)
-    ax2.set_xticklabels(tick_function(xticks), fontsize=fontsize)
-    ax2.set_xlabel("Risc score", fontsize=fontsize)
+#     ax2.set_xlim(xlim)
+#     ax2.set_xticks(xticks)
+#     ax2.set_xticklabels(tick_function(xticks), fontsize=fontsize)
+#     ax2.set_xlabel("Risc score", fontsize=fontsize)
 
-    ax.axvline(cutoff_logodds, ls="--", color="k", alpha=0.3)
+#     ax.axvline(cutoff_logodds, ls="--", color="k", alpha=0.3)
 
-    ax.axvspan(xlim[0], cutoff_logodds, alpha=0.1, color=blue)
-    ax.axvspan(cutoff_logodds, xlim[1], alpha=0.1, color=red)
+#     ax.axvspan(xlim[0], cutoff_logodds, alpha=0.1, color=blue)
+#     ax.axvspan(cutoff_logodds, xlim[1], alpha=0.1, color=red)
 
-    pred = (x + dx)[-1]
-    ax.plot((pred, pred), (y_pos[-1], ylim[-1]), "-k")
+#     pred = (x + dx)[-1]
+#     ax.plot((pred, pred), (y_pos[-1], ylim[-1]), "-k")
 
 
 #%%
 
 
-def make_beeswarm_shap_plots(data_shap, cfg_str):
+# def make_beeswarm_shap_plots(data_shap, cfg_str):
 
-    for y_label, d_shap in data_shap.items():
+#     for y_label, d_shap in data_shap.items():
 
-        for method in ["ML", "LR"]:
+#         for method in ["ML", "LR"]:
 
-            figname = f"./figures/feature_importance_beeswarm__{y_label}__{method}__{cfg_str}.pdf"
+#             figname = f"./figures/feature_importance_beeswarm__{y_label}__{method}__{cfg_str}.pdf"
 
-            # if len(d_shap[method].values.shape) == 3:
-            # d_shap[method].values = d_shap[method].values[:, :, 1]
+#             # if len(d_shap[method].values.shape) == 3:
+#             # d_shap[method].values = d_shap[method].values[:, :, 1]
 
-            shap.plots.beeswarm(d_shap[method], max_display=20, show=False)
-            plt.savefig(figname, bbox_inches="tight")
+#             shap.plots.beeswarm(d_shap[method], max_display=20, show=False)
+#             plt.savefig(figname, bbox_inches="tight")
 
-            # figname_png = figname.replace(".pdf", ".png").replace(
-            #     "/feature_importance", "/pngs/feature_importance"
-            # )
+#             # figname_png = figname.replace(".pdf", ".png").replace(
+#             #     "/feature_importance", "/pngs/feature_importance"
+#             # )
 
-            # plt.savefig(figname_png, bbox_inches="tight")
-            plt.close("all")
+#             # plt.savefig(figname_png, bbox_inches="tight")
+#             plt.close("all")
 
 
 #%%
@@ -2936,7 +3134,7 @@ def plot_shap_hb(
     ypos_text=0.99,
     num_digigts=4,
     do_fix_colorbar_shape=True,
-    variable="hb"
+    variable="hb",
 ):
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -2984,9 +3182,8 @@ def plot_shap_hb_2_split(
     ypos_text=0.99,
     num_digigts=4,
     do_fix_colorbar_shape=True,
-    variable="hb"
+    variable="hb",
 ):
-
 
     fig, (ax1, ax2) = plt.subplots(figsize=(10, 10), nrows=2, sharex=True)
 

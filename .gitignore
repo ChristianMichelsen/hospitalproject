@@ -1,8 +1,5 @@
 old/
 data*
-models/
-figures/
-_figures/
 results/
 *.joblib
 *.pkl
@@ -14,3 +11,4 @@ __pycache__/*
 .DS_Store
 __pycache__/*.pyc
 */*.pyc
+*.code-workspace
