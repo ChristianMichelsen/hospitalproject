@@ -654,6 +654,14 @@ def extract_data_risc_scores(dicts):
             "y_train": dicts["data"][key]["y_train_val"],
             "y_pred_proba_train": dicts["y_pred_proba_train"][key],
         }
+
+        if key != "only_age":
+            d_risc_scores["y_pred_proba_uncalibrated"] = dicts[
+                "y_pred_proba_uncalibrated"
+            ][key]
+            d_risc_scores["y_pred_proba_train_uncalibrated"] = dicts[
+                "y_pred_proba_train_uncalibrated"
+            ][key]
     return d_risc_scores
 
 
