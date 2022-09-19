@@ -18,7 +18,7 @@ plt.rcParams.update({"text.usetex": False})
 # run_all_models = False
 # run_all_models = True
 # plot_stuff = False
-plot_stuff = False
+plot_stuff = True
 # save_stuff = False
 save_stuff = True
 forced = False
@@ -110,10 +110,6 @@ else:
 
     for y_label in y_labels:
 
-        # break
-        # x = x
-        # reload(extra_funcs)
-
         dict_variables = [
             "data",
             "y_pred_proba",
@@ -139,19 +135,12 @@ else:
             Path(filename_table).parent.mkdir(parents=True, exist_ok=True)
             df_table.to_csv(filename_table)
 
-        # reload(extra_funcs)
         extra_funcs.add_model_age_only(
             dicts=dicts,
             y_label=y_label,
             key="only_age",
             PPF_cut=PPF,
         )
-        # extra_funcs.add_model_risc_score1(
-        #     dicts=dicts,
-        #     y_label=y_label,
-        #     key="risc_score1",
-        #     PPF_cut=PPF,
-        # )
 
         extra_funcs.add_model_LR(
             dicts=dicts,
@@ -170,14 +159,6 @@ else:
             do_calibration=do_calibration,
         )
 
-        # extra_funcs.add_model_LR(
-        #     dicts=dicts,
-        #     y_label=y_label,
-        #     key="LR__exclude_age",
-        #     exclude="age",
-        #     PPF_cut=PPF,
-        # )
-
         extra_funcs.add_ML_model(
             cfg=cfg,
             dicts=dicts,
@@ -188,32 +169,6 @@ else:
             PPF_cut=PPF,
             do_calibration=do_calibration,
         )
-
-        # if run_all_models:
-        # extra_funcs.add_ML_model(
-        #     cfg=cfg,
-        #     dicts=dicts,
-        #     y_label=y_label,
-        #     use_FL=use_FL,
-        #     key="ML__exclude_age",
-        #     name=f"{y_label}__ML__exclude_age__{cfg_str}",
-        #     exclude="age",
-        #     PPF_cut=PPF,
-        # )
-
-        # if add_ML_26:
-        #     cols_26_ordered = extra_funcs.load_cols_26(y_label)
-        #     extra_funcs.add_ML_model(
-        #         cfg=cfg,
-        #         dicts=dicts,
-        #         y_label=y_label,
-        #         key=f"ML__26",
-        #         use_FL=use_FL,
-        #         # name=f"{y_label}__ML__{cfg_str}",
-        #         name=f"{y_label}__ML__26__{cfg_str}",
-        #         include=cols_26_ordered,
-        #         PPF_cut=PPF,
-        #     )
 
         shap_ordered_columns = extra_funcs.get_shap_ordered_columns(
             dicts=dicts,
@@ -356,6 +311,20 @@ print("\n\n\nfinished")
 
 # special.logit(cutoff) # prob to log-odds
 # special.expit(0) # log-odds to prob
+
+
+#%%
+
+# reload(extra_funcs)
+
+df_table = extra_funcs.get_table_df_train_test()
+if save_stuff:
+    filename_table = f"./results/table__train_test.csv"
+    Path(filename_table).parent.mkdir(parents=True, exist_ok=True)
+    df_table.to_csv(filename_table)
+
+
+#%%
 
 #%%
 

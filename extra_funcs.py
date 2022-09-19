@@ -182,6 +182,21 @@ def remove_to_much_nans(df):
     return df[mask]
 
 
+def fix_cancer_rested_bug(df):
+
+    mask = (df["date"].dt.year == 2014) | (df["date"].dt.year == 2015)
+
+    d_map = {
+        1.0: 0.0,
+        0.0: 1.0,
+    }
+
+    df.loc[mask, "cancer"] = df.loc[mask, "cancer"].replace(d_map)
+    df.loc[mask, "rested"] = df.loc[mask, "rested"].replace(d_map)
+
+    return df
+
+
 def load_entire_dataframe(filename=filename_csv):
 
     df = (
@@ -192,6 +207,7 @@ def load_entire_dataframe(filename=filename_csv):
         .pipe(add_cuts)
         .pipe(remove_date_nans)
         .pipe(add_date_info_to_df)
+        .pipe(fix_cancer_rested_bug)
         # .pipe(remove_to_much_nans)
         .reset_index(drop=True)
     )
@@ -472,6 +488,28 @@ def get_table_df(y_label):
 
     for col, val in (X.isnull().sum() / len(X)).items():
         df_table.loc[col, "Missing"] = f"{val:.1%}"
+
+    return df_table.sort_index().fillna("-")
+
+
+def get_table_df_train_test():
+    d_data = get_data("outcome_A")
+    X_train_val = d_data["X_train_val"].drop(columns="year")
+    X_test = d_data["X_test"].drop(columns="year")
+
+    d_table = {}
+    d_table["Train"] = get_table(X_train_val)
+    d_table["Test"] = get_table(X_test)
+
+    df_table = pd.DataFrame(d_table)
+
+    df_table["Missing_train"] = ["-"] * len(df_table)
+    for col, val in (X_train_val.isnull().sum() / len(X_train_val)).items():
+        df_table.loc[col, "Missing_train"] = f"{val:.2%}"
+
+    df_table["Missing_test"] = ["-"] * len(df_table)
+    for col, val in (X_test.isnull().sum() / len(X_test)).items():
+        df_table.loc[col, "Missing_test"] = f"{val:.2%}"
 
     return df_table.sort_index().fillna("-")
 
