@@ -328,94 +328,10 @@ if save_stuff:
 
 #%%
 
-x = x
+make_shape_plots = True
+# make_shape_plots = False
 
-
-#%%
-
-# E = data_all['y'].sum()
-
-E = 1476
-n = 22017
-phi = E / n
-P = 33
-MAPE = 0.05
-
-B1 = (1.96 / 0.05) ** 2 * phi * (1 - phi)
-B1
-
-B2 = np.exp((-0.508 + 0.259 * np.log(phi) + 0.504 * np.log(P) - np.log(MAPE)) / 0.544)
-B2
-
-ln_L_null = E * np.log(E / n) + (n - E) * np.log((n - E) / n)
-max_R2_CS = 1 - np.exp(2 * ln_L_null / n)
-max_R2_CS
-
-frac_variability = 0.20
-R2_anticipated = frac_variability * max_R2_CS
-S = 0.9
-
-B3 = P / ((S - 1) * np.log(1 - R2_anticipated / S))
-B3
-
-# %%
-from sklearn.calibration import calibration_curve
-from sklearn.metrics import brier_score_loss
-
-key = "ML"
-
-
-y_test = data_risc_scores["outcome_A"][key]["y_test"]
-y_pred_proba_calibrated = data_risc_scores["outcome_A"][key]["y_pred_proba"]
-
-
-prob_true_calibrated, prob_pred_calibrated = calibration_curve(
-    y_test,
-    y_pred_proba_calibrated,
-    n_bins=20,
-)
-
-
-print(brier_score_loss(y_test, y_pred_proba_calibrated))
-
-
-y_pred_proba_uncalibrated = dicts["y_pred_proba_uncalibrated"][key]
-
-prob_true_uncalibrated, prob_pred_uncalibrated = calibration_curve(
-    y_test,
-    y_pred_proba_uncalibrated,
-    n_bins=20,
-)
-print(brier_score_loss(y_test, y_pred_proba_uncalibrated))
-
-
-#%%
-
-fig, ax = plt.subplots(figsize=(10, 6))
-
-ax.plot([0, 1], [0, 1], linestyle="-")
-
-ax.plot(
-    prob_pred_uncalibrated,
-    prob_true_uncalibrated,
-    marker=".",
-    label="uncalibrated",
-)
-
-if do_calibration:
-    ax.plot(
-        prob_pred_calibrated,
-        prob_true_calibrated,
-        marker=".",
-        label="calibrated",
-    )
-ax.set(xlabel="Mean predicted probability", ylabel="Fraction of positives")
-ax.legend()
-
-#%%
-
-
-if False:
+if make_shape_plots:
 
     from matplotlib.backends.backend_pdf import PdfPages
 
@@ -451,10 +367,11 @@ if False:
             d["Title"] = "SHAP interaction values"
             d["Author"] = "Christian Michelsen"
 
+
 #%%
 
 
-if False:
+if make_shape_plots:
 
     d_translate = extra_funcs.d_translate
 
@@ -502,101 +419,10 @@ if False:
 
 #%%
 
-
-if False:
-
-    d_risc_scores = data_risc_scores["outcome_A"]["ML"]
-    cutoff = d_risc_scores["cutoff"]
-    y_pred_proba = dicts["y_pred_proba"]["ML"]
-    y_test = dicts["y_test"]["ML"]
-
-    y_test.sum()
-
-    (y_pred_proba > cutoff).sum()
-    (y_pred_proba > 0.5).sum()
-    (y_pred_proba > 0.6).sum()
-
-    from sklearn.metrics import brier_score_loss
-
-    brier_score_loss(y_test, y_pred_proba)
-    brier_score_loss(y_test, y_pred_proba > cutoff)
-
-    from sklearn.calibration import calibration_curve
-
-    prob_true, prob_pred = calibration_curve(y_test, y_pred_proba, n_bins=5)
-
-    # plot perfectly calibrated
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    ax.plot([0, 1], [0, 1], linestyle="--")
-    ax.plot(prob_pred, prob_true, marker=".")
-    ax.set(xlabel="Mean predicted probability", ylabel="Fraction of positives")
-
-    cutoff_LR = dicts["results"]["LR"]["cutoff"]
-    y_pred_proba_LR = dicts["y_pred_proba"]["LR"]
-    y_test = dicts["data"]["LR"]["y_test"]
-
-    brier_score_loss(y_test, y_pred_proba_LR)
-
-    prob_true_LR, prob_pred_LR = calibration_curve(y_test, y_pred_proba_LR, n_bins=10)
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    ax.plot([0, 1], [0, 1], linestyle="--")
-    ax.plot(prob_pred_LR, prob_true_LR, marker=".")
-    ax.set(xlabel="Mean predicted probability", ylabel="Fraction of positives")
-
-
-#%%
-
-if False:
-    X_patient = extra_funcs.get_patient(data_all)
-    models["outcome_B"].predict(X_patient)
-    X_patient2 = X_patient.copy()
-    X_patient2["group_resp"] = 10.0
-    models["outcome_B"].predict(X_patient2)
-
-# %%
-
-if False:
-
-    d_risc_scores = data_risc_scores["outcome_A"]["ML"]
-    cutoff = d_risc_scores["cutoff"]
-    y_pred_proba = d_risc_scores["y_pred_proba"]
-
-    worst = np.argmax(y_pred_proba)
-    best = np.argmin(y_pred_proba)
-
-    d_risc_scores["y_test"].iloc[worst]
-    d_risc_scores["y_test"].iloc[best]
-
-    X_worst = data_all["X_test"].iloc[worst]
-    X_best = data_all["X_test"].iloc[best]
-
-    y_pred_worst = models["outcome_A"].predict(X_worst)[0]
-    y_pred_best = models["outcome_A"].predict(X_best)[0]
-
-    X_worst_low_age = X_worst.copy()
-    print(X_worst_low_age["age"])
-    X_worst_low_age["age"] = 18
-    X_best_high_age = X_best.copy()
-    print(X_best_high_age["age"])
-    X_best_high_age["age"] = 100
-
-    y_pred_worst_low_age = models["outcome_A"].predict(X_worst_low_age)[0]
-    y_pred_best_high_age = models["outcome_A"].predict(X_best_high_age)[0]
-
-    print(f"Cutoff: {cutoff:.3f}")
-    print(f"Worst patient: {y_pred_worst:.3f}, low age: {y_pred_worst_low_age:.3f}")
-    print(f"Best patient: {y_pred_best:.3f}, high age: {y_pred_best_high_age:.3f}")
-    # %%
-
-
 #%%
 
 
-if False:
+if make_shape_plots:
 
     from copy import deepcopy
 
@@ -709,7 +535,7 @@ if False:
 
 #%%
 
-if False:
+if make_shape_plots:
 
     from copy import deepcopy
 

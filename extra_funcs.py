@@ -19,23 +19,13 @@ from optuna.samplers import TPESampler
 from sklearn import linear_model
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer, SimpleImputer
-from sklearn.metrics import (
-    accuracy_score,
-    auc,
-    average_precision_score,
-    brier_score_loss,
-    classification_report,
-    cohen_kappa_score,
-    confusion_matrix,
-    f1_score,
-    fbeta_score,
-    matthews_corrcoef,
-    precision_recall_curve,
-    precision_recall_fscore_support,
-    recall_score,
-    roc_auc_score,
-    roc_curve,
-)
+from sklearn.metrics import (accuracy_score, auc, average_precision_score,
+                             brier_score_loss, classification_report,
+                             cohen_kappa_score, confusion_matrix, f1_score,
+                             fbeta_score, matthews_corrcoef,
+                             precision_recall_curve,
+                             precision_recall_fscore_support, recall_score,
+                             roc_auc_score, roc_curve)
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
@@ -3117,7 +3107,7 @@ def fit_logistic(shaps):
     x = x[~nans]
     y = y[~nans]
 
-    p0 = [0.5, -0.2, 0.1, 8.0]
+    p0 = [0.5, -0.2, 0.1, np.mean(x)]
     logistic_params, covariance = curve_fit(logistic_curve, x, y, p0=p0)
 
     return logistic_params, covariance
