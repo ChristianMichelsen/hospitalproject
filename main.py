@@ -13,7 +13,9 @@ import shap
 import extra_funcs
 
 # plt.rcParams.update({"text.usetex": True})
-plt.rcParams.update({"text.usetex": False})
+# plt.rcParams.update({"text.usetex": False})
+plt.style.use("plotstyle.mplstyle")
+
 
 # run_all_models = False
 # run_all_models = True
@@ -315,6 +317,23 @@ print("\n\n\nfinished")
 
 #%%
 
+
+reload(extra_funcs)
+
+if plot_stuff:
+
+    for outcome in ["outcome_A", "outcome_B"]:
+        # break
+
+        fig_calibration = extra_funcs.plot_calibration_curves(
+            data_risc_scores,
+            outcome=outcome,
+        )
+        filename = f"./figures/shap_interation__{outcome}.pdf"
+        fig_calibration.savefig(filename, dpi=300, bbox_inches="tight")
+
+#%%
+
 # reload(extra_funcs)
 
 df_table = extra_funcs.get_table_df_train_test()
@@ -326,8 +345,6 @@ if save_stuff:
 
 #%%
 
-#%%
- 
 make_shape_plots = True
 make_shape_plots = False
 
@@ -419,10 +436,10 @@ if make_shape_plots:
 
 #%%
 
-#%%
-
 
 if make_shape_plots:
+
+    reload(extra_funcs)
 
     from copy import deepcopy
 
@@ -434,6 +451,9 @@ if make_shape_plots:
     shaps_age = shaps[:, d_translate["age"]]
     shaps_sex = shaps[:, d_translate["sex"]]
     shaps_joint = shaps[:, d_translate["joint"]]
+
+    shaps_hb = deepcopy(shaps_hb)
+    shaps_hb.data *= 18
 
     mask_women = shaps_sex.data == 0
     mask_men = shaps_sex.data == 1
@@ -532,6 +552,50 @@ if make_shape_plots:
     filename = f"./figures/shap_interation__outcome_A__ML__hb__gender__knee.pdf"
     fig_hb_gender_knee.savefig(filename, dpi=300, bbox_inches="tight")
 
+
+#%%
+
+
+def print_shaps_mean_IQR(x):
+
+    print(
+        f"mean = {np.mean(x):.3f}, "
+        f"median = {np.median(x):.3f}, "
+        f"25% = {np.percentile(x, 25):.3f}, "
+        f"75% = {np.percentile(x, 75):.3f}"
+    )
+
+
+if False:
+
+    shaps_hb = shaps[:, d_translate["hb"]]
+    shaps_sex = shaps[:, d_translate["sex"]]
+
+    mask_women = shaps_sex.data == 0
+    mask_men = shaps_sex.data == 1
+
+    shaps_hb_women = extra_funcs.get_masked_version(shaps_hb, mask_women)
+    shaps_hb_men = extra_funcs.get_masked_version(shaps_hb, mask_men)
+
+    shaps_hb_all_anemia = shaps_hb.values[shaps_hb.data < 8.0]
+    shaps_hb_women_anemia = shaps_hb_women.values[shaps_hb_women.data < 8.0]
+    shaps_hb_men_anemia = shaps_hb_men.values[shaps_hb_men.data < 8.0]
+
+    print_shaps_mean_IQR(shaps_hb_all_anemia)
+    print_shaps_mean_IQR(shaps_hb_women_anemia)
+    print_shaps_mean_IQR(shaps_hb_men_anemia)
+
+    mask_knee = shaps_joint.data == 0
+    mask_hip = shaps_joint.data == 1
+
+    shaps_hb_hip = extra_funcs.get_masked_version(shaps_hb, mask_hip)
+    shaps_hb_knee = extra_funcs.get_masked_version(shaps_hb, mask_knee)
+
+    shaps_hb_hip_anemia = shaps_hb_hip.values[shaps_hb_hip.data < 8.0]
+    shaps_hb_knee_anemia = shaps_hb_knee.values[shaps_hb_knee.data < 8.0]
+
+    print_shaps_mean_IQR(shaps_hb_hip_anemia)
+    print_shaps_mean_IQR(shaps_hb_knee_anemia)
 
 #%%
 

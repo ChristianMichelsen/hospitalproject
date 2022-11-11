@@ -13,19 +13,30 @@ import optuna
 import pandas as pd
 import seaborn as sns
 import shap
+from matplotlib.ticker import PercentFormatter
 from optuna.integration import LightGBMPruningCallback
 from optuna.pruners import MedianPruner
 from optuna.samplers import TPESampler
 from sklearn import linear_model
+from sklearn.calibration import calibration_curve
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer, SimpleImputer
-from sklearn.metrics import (accuracy_score, auc, average_precision_score,
-                             brier_score_loss, classification_report,
-                             cohen_kappa_score, confusion_matrix, f1_score,
-                             fbeta_score, matthews_corrcoef,
-                             precision_recall_curve,
-                             precision_recall_fscore_support, recall_score,
-                             roc_auc_score, roc_curve)
+from sklearn.metrics import (
+    accuracy_score,
+    auc,
+    average_precision_score,
+    brier_score_loss,
+    classification_report,
+    cohen_kappa_score,
+    confusion_matrix,
+    f1_score,
+    fbeta_score,
+    matthews_corrcoef,
+    precision_recall_curve,
+    recall_score,
+    roc_auc_score,
+    roc_curve,
+)
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
@@ -673,7 +684,9 @@ def create_length_of_stay_sig_bkg(data_df):
 
 
 def extract_data_risc_scores(dicts):
+
     d_risc_scores = {}
+
     for key in dicts["data"].keys():
         d_risc_scores[key] = {
             "y_test": dicts["data"][key]["y_test"],
@@ -684,12 +697,13 @@ def extract_data_risc_scores(dicts):
         }
 
         if key != "only_age":
-            d_risc_scores["y_pred_proba_uncalibrated"] = dicts[
+            d_risc_scores[key]["y_pred_proba_uncalibrated"] = dicts[
                 "y_pred_proba_uncalibrated"
             ][key]
-            d_risc_scores["y_pred_proba_train_uncalibrated"] = dicts[
+            d_risc_scores[key]["y_pred_proba_train_uncalibrated"] = dicts[
                 "y_pred_proba_train_uncalibrated"
             ][key]
+
     return d_risc_scores
 
 
@@ -3292,5 +3306,114 @@ def plot_shap_hb_2_split(
 
     if do_fix_colorbar_shape:
         fix_colorbar_shap(ax2)
+
+    return fig
+
+
+#%%
+
+# Calibration
+
+
+def plot_calibration_curves(
+    data_risc_scores,
+    use_train=True,
+    outcome="outcome_A",
+):
+
+    use_train = True
+
+    if use_train:
+        y_true = "y_train"
+        y_pred = "y_pred_proba_train"
+        y_pred_uncalibrated = "y_pred_proba_train_uncalibrated"
+    else:
+        y_true = "y_test"
+        y_pred = "y_pred_proba"
+        y_pred_uncalibrated = "y_pred_proba_uncalibrated"
+
+    y_true_ML = data_risc_scores[outcome]["ML"][y_true]
+    y_prob_ML_calibrated = data_risc_scores[outcome]["ML"][y_pred]
+    y_prob_ML_uncalibrated = data_risc_scores[outcome]["ML"][y_pred_uncalibrated]
+
+    y_true_LR = data_risc_scores[outcome]["LR"][y_true]
+    y_prob_LR_calibrated = data_risc_scores[outcome]["LR"][y_pred]
+    y_prob_LR_uncalibrated = data_risc_scores[outcome]["LR"][y_pred_uncalibrated]
+
+    prob_true_ML_calibrated, prob_pred_ML_calibrated = calibration_curve(
+        y_true_ML,
+        y_prob_ML_calibrated,
+        n_bins=10,
+    )
+    prob_true_ML_uncalibrated, prob_pred_ML_uncalibrated = calibration_curve(
+        y_true_ML,
+        y_prob_ML_uncalibrated,
+        n_bins=10,
+    )
+
+    prob_true_LR_calibrated, prob_pred_LR_calibrated = calibration_curve(
+        y_true_LR,
+        y_prob_LR_calibrated,
+        n_bins=10,
+    )
+    prob_true_LR_uncalibrated, prob_pred_LR_uncalibrated = calibration_curve(
+        y_true_LR,
+        y_prob_LR_uncalibrated,
+        n_bins=10,
+    )
+
+    fig, ax = plt.subplots()
+    ax.plot(
+        [0, 1],
+        [0, 1],
+        "k--",
+        label="Perfectly calibrated",
+    )
+    ax.plot(
+        prob_pred_ML_calibrated,
+        prob_true_ML_calibrated,
+        color="C0",
+        marker="o",
+        linewidth=1,
+        label="ML: Calibrated",
+    )
+    ax.plot(
+        prob_pred_ML_uncalibrated,
+        prob_true_ML_uncalibrated,
+        color="C0",
+        linestyle="--",
+        marker=".",
+        linewidth=1,
+        label="ML: Un-calibrated",
+    )
+
+    ax.plot(
+        prob_pred_LR_calibrated,
+        prob_true_LR_calibrated,
+        color="C1",
+        marker="o",
+        linewidth=1,
+        label="LR: Calibrated",
+    )
+    ax.plot(
+        prob_pred_LR_uncalibrated,
+        prob_true_LR_uncalibrated,
+        color="C1",
+        linestyle="--",
+        marker=".",
+        linewidth=1,
+        label="LR: Un-calibrated",
+    )
+
+    ax.set(
+        xlabel="Predicted probability",
+        ylabel="True probability in each bin",
+        xlim=(0, 1.02),
+        ylim=(0, 1.02),
+    )
+
+    ax.xaxis.set_major_formatter(PercentFormatter(1))
+    ax.yaxis.set_major_formatter(PercentFormatter(1))
+    ax.legend()
 
     return fig
