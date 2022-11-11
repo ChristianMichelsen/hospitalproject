@@ -329,7 +329,7 @@ if plot_stuff:
             data_risc_scores,
             outcome=outcome,
         )
-        filename = f"./figures/shap_interation__{outcome}.pdf"
+        filename = f"./figures/calibration__{outcome}.pdf"
         fig_calibration.savefig(filename, dpi=300, bbox_inches="tight")
 
 #%%
